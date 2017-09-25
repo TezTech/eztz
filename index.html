@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+
+  </head>
+  <body>
+ 
+    
+
+    <script src="./eztz.js"></script>
+    <script>
+        eztz_ready(function(eztz){
+            var m = eztz.generateMnemonic();
+            var keys = eztz.generateKeys(m, 'test');
+            console.log(keys);
+        });
+    </script>
+    
+  </body>
+</html>

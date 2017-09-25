@@ -1,0 +1,8 @@
+{
+  "dependencies": {
+    "bip39": "^2.4.0",
+    "buffer": "^5.0.7",
+    "js-nacl": "^1.2.2",
+    "libsodium-wrappers": "^0.5.4"
+  }
+}
