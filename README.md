@@ -1,6 +1,8 @@
 # eztz
 Easy Tezos key generator and utility tool - It's eztz! Live demo: http://173.254.236.122/keygen.html
 
+#### *** Disclaimer - all keys generated should be treated as live. Please use the tool offline, and endavour to keep any input/output data secure and private ***
+
 ### Installation
 In browser, just include eztz.js and you're good to go.
 
@@ -39,7 +41,7 @@ Returns an object with generated keys and associated data, as per below:
 ### Future Development
 We will be working on this library on a regular basis, with hopes of adding more functiliaty (message signing/verification etc).
 
-### Credits
+### Support Us
 Please consider donating to help us develop this, and other Tezos related tools: Bitcoin: 1KSiyfgs5XwTZjaLpmCTHxonsyXMx383P1
 
 ### Credits
