@@ -1,5 +1,5 @@
 # eztz
-Easy Tezos key generator and utility tool - It's eztz!
+Easy Tezos key generator and utility tool - It's eztz! Live demo: http://173.254.236.122/keygen.html
 
 ### Installation
 In browser, just include eztz.js and you're good to go.
