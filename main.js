@@ -45,7 +45,7 @@ nacl_factory.instantiate(function (nacl) {
         },
         generateKeys : function(m,p){
             var ss = Math.random().toString(36).slice(2);
-            var s = bip39.mnemonicToSeed(m, pbkdf2.pbkdf2Sync(p, ss, 3, 32, 'sha512').toString()).slice(0, 32);
+            var s = bip39.mnemonicToSeed(m, pbkdf2.pbkdf2Sync(p, ss, 0, 32, 'sha512').toString()).slice(0, 32);
             var kp = nacl.crypto_sign_seed_keypair(s);
             return {
                 mnemonic : m,
@@ -58,7 +58,7 @@ nacl_factory.instantiate(function (nacl) {
         },
         generateKeysFromSeedMulti : function(m,p,n){
             n /= (256^2);
-            var s = bip39.mnemonicToSeed(m, pbkdf2.pbkdf2Sync(p, n.toString(36).slice(2), 3, 32, 'sha512').toString()).slice(0, 32);
+            var s = bip39.mnemonicToSeed(m, pbkdf2.pbkdf2Sync(p, n.toString(36).slice(2), 0, 32, 'sha512').toString()).slice(0, 32);
             var kp = nacl.crypto_sign_seed_keypair(s);
             return {
                 mnemonic : m,
