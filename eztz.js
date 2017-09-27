@@ -1,4 +1,81 @@
 (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+const Buffer = require('buffer/').Buffer,
+bs58check = require('bs58check'),
+nacl_factory = require("js-nacl"),
+sodium = require('libsodium-wrappers'),
+bip39 = require('bip39'),
+pbkdf2 = require('pbkdf2'),
+prefix = {
+    tz1: new Uint8Array([6, 161, 159]),
+    edpk: new Uint8Array([13, 15, 37, 217]),
+    edsk: new Uint8Array([43, 246, 78, 7]),
+},
+o = function(payload, prefix) {
+    var n = new Uint8Array(prefix.length + payload.length);
+    n.set(prefix);
+    n.set(payload, prefix.length);
+    return bs58check.encode(new Buffer(n, 'hex'));
+},
+p = function(enc, prefix) {
+    var n = bs58check.decode(enc);
+    n = n.slice(prefix.length);
+    return n;
+};
+var eztz_ready_function = false;
+window.eztz_ready = function(e){
+    if (typeof window.eztz != 'undefined') {
+        e(window.eztz);
+    } else {
+        eztz_ready_function = e;
+    }
+}
+nacl_factory.instantiate(function (nacl) {
+    window.nacl = nacl;
+    window.eztz = {
+        prefix : prefix,
+        encodeb58 : o,
+        decodeb58 : p,
+        generateMnemonic : function(){return bip39.generateMnemonic(160);},
+        generateKeysNoSeed : function(){
+            var kp = nacl.crypto_sign_keypair();
+            return {
+                sk : o(kp.signSk, prefix.edsk),
+                pk : o(kp.signPk, prefix.edpk),
+                pkh : o(sodium.crypto_generichash(20, kp.signPk), prefix.tz1),
+            };
+        },
+        generateKeys : function(m,p){
+            var ss = Math.random().toString(36).slice(2);
+            var s = bip39.mnemonicToSeed(m, pbkdf2.pbkdf2Sync(p, ss, 3, 32, 'sha512').toString()).slice(0, 32);
+            var kp = nacl.crypto_sign_seed_keypair(s);
+            return {
+                mnemonic : m,
+                passphrase : p,
+                salt : ss,
+                sk : o(kp.signSk, prefix.edsk),
+                pk : o(kp.signPk, prefix.edpk),
+                pkh : o(sodium.crypto_generichash(20, kp.signPk), prefix.tz1),
+            };
+        },
+        generateKeysFromSeedMulti : function(m,p,n){
+            n /= (256^2);
+            var s = bip39.mnemonicToSeed(m, pbkdf2.pbkdf2Sync(p, n.toString(36).slice(2), 3, 32, 'sha512').toString()).slice(0, 32);
+            var kp = nacl.crypto_sign_seed_keypair(s);
+            return {
+                mnemonic : m,
+                passphrase : p,
+                n : n,
+                sk : o(kp.signSk, prefix.edsk),
+                pk : o(kp.signPk, prefix.edpk),
+                pkh : o(sodium.crypto_generichash(20, kp.signPk), prefix.tz1),
+            };
+        },
+    };
+    if (eztz_ready_function){
+        eztz_ready_function(window.eztz);
+    }
+});
+},{"bip39":4,"bs58check":13,"buffer/":14,"js-nacl":22,"libsodium-wrappers":23,"pbkdf2":25}],2:[function(require,module,exports){
 // base-x encoding
 // Forked from https://github.com/cryptocoinjs/bs58
 // Originally written by Mike Hearn for BitcoinJ
@@ -7,14 +84,19 @@
 // Merged Buffer refactorings from base58-native by Stephen Pair
 // Copyright (c) 2013 BitPay Inc
 
+var Buffer = require('safe-buffer').Buffer
+
 module.exports = function base (ALPHABET) {
   var ALPHABET_MAP = {}
   var BASE = ALPHABET.length
   var LEADER = ALPHABET.charAt(0)
 
   // pre-compute lookup table
-  for (var i = 0; i < ALPHABET.length; i++) {
-    ALPHABET_MAP[ALPHABET.charAt(i)] = i
+  for (var z = 0; z < ALPHABET.length; z++) {
+    var x = ALPHABET.charAt(z)
+
+    if (ALPHABET_MAP[x] !== undefined) throw new TypeError(x + ' is ambiguous')
+    ALPHABET_MAP[x] = z
   }
 
   function encode (source) {
@@ -45,7 +127,7 @@ module.exports = function base (ALPHABET) {
   }
 
   function decodeUnsafe (string) {
-    if (string.length === 0) return []
+    if (string.length === 0) return Buffer.allocUnsafe(0)
 
     var bytes = [0]
     for (var i = 0; i < string.length; i++) {
@@ -69,12 +151,12 @@ module.exports = function base (ALPHABET) {
       bytes.push(0)
     }
 
-    return bytes.reverse()
+    return Buffer.from(bytes.reverse())
   }
 
   function decode (string) {
-    var array = decodeUnsafe(string)
-    if (array) return array
+    var buffer = decodeUnsafe(string)
+    if (buffer) return buffer
 
     throw new Error('Non-base' + BASE + ' character')
   }
@@ -86,104 +168,7 @@ module.exports = function base (ALPHABET) {
   }
 }
 
-},{}],2:[function(require,module,exports){
-(function (Buffer){
-/*
-* @Author: zyc
-* @Date:   2016-09-11 23:36:05
-* @Last Modified by:   unrealce
-* @Last Modified time: 2016-09-13 01:26:13
-*/
-'use strict'
-
-const crypto = require('crypto')
-const base58 = require('bs58')
-
-
-module.exports.encode = (data, prefix = '00', encoding = 'hex') => {
-  if (typeof data === 'string') {
-    data = new Buffer(data, encoding)
-  }
-  if (!(data instanceof Buffer)) {
-    throw new TypeError('"data" argument must be an Array of Buffers')
-  }
-  if (!(prefix instanceof Buffer)) {
-    prefix = new Buffer(prefix, encoding)
-  }
-  let hash = Buffer.concat([prefix, data])
-  hash = crypto.createHash('sha256').update(hash).digest()
-  hash = crypto.createHash('sha256').update(hash).digest()
-  hash = Buffer.concat([prefix, data,  hash.slice(0, 4)])
-  return base58.encode(hash)
-}
-
-module.exports.decode = (string, encoding) => {
-  const buffer = new Buffer(base58.decode(string))
-  let prefix = buffer.slice(0, 1)
-  let data = buffer.slice(1, -4)
-  let hash = Buffer.concat([prefix, data])
-  hash = crypto.createHash('sha256').update(hash).digest()
-  hash = crypto.createHash('sha256').update(hash).digest()
-  buffer.slice(-4).forEach((check, index) => {
-    if (check !== hash[index]) {
-      throw new Error('Invalid checksum')
-    }
-  })
-  if (encoding) {
-    prefix = prefix.toString(encoding)
-    data = data.toString(encoding)
-  }
-  return { prefix, data }
-}
-}).call(this,require("buffer").Buffer)
-},{"bs58":3,"buffer":88,"crypto":97}],3:[function(require,module,exports){
-var basex = require('base-x')
-var ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
-
-module.exports = basex(ALPHABET)
-
-},{"base-x":1}],4:[function(require,module,exports){
-const Buffer = require('buffer/').Buffer,
-base58check = require('base58check'),
-nacl_factory = require("js-nacl"),
-sodium = require('libsodium-wrappers'),
-bip39 = require('bip39'),
-prefix = {
-    tz1: new Uint8Array([6, 161, 159]),
-    edpk: new Uint8Array([13, 15, 37, 217]),
-    edsk: new Uint8Array([43, 246, 78, 7]),
-},
-o = function(payload, prefix) {
-    return base58check.encode(sodium.to_hex(payload), sodium.to_hex(prefix));
-};
-var eztz_ready_function = false;
-window.eztz_ready = function(e){
-    if (typeof window.eztz != 'undefined') {
-        e(window.eztz);
-    } else {
-        eztz_ready_function = e;
-    }
-}
-nacl_factory.instantiate(function (nacl) {
-    window.eztz = {
-        generateMnemonic : function(){return bip39.generateMnemonic(160);},
-        generateKeys : function(m,p){
-            var s = bip39.mnemonicToSeed(m, p).slice(0, 32);
-            var kp = nacl.crypto_sign_seed_keypair(s);
-            return {
-                mnemonic : m,
-                passphrase : p,
-                sk : o(kp.signSk, prefix.edsk),
-                pk : o(kp.signPk, prefix.edpk),
-                pkh : o(sodium.crypto_generichash(20, kp.signPk), prefix.tz1),
-            };
-        },
-    };
-    if (eztz_ready_function){
-        eztz_ready_function(window.eztz);
-    }
-});
-},{"base58check":2,"bip39":6,"buffer/":14,"js-nacl":22,"libsodium-wrappers":23}],5:[function(require,module,exports){
+},{"safe-buffer":32}],3:[function(require,module,exports){
 'use strict'
 
 exports.byteLength = byteLength
@@ -299,7 +284,7 @@ function fromByteArray (uint8) {
   return parts.join('')
 }
 
-},{}],6:[function(require,module,exports){
+},{}],4:[function(require,module,exports){
 var Buffer = require('safe-buffer').Buffer
 var createHash = require('create-hash')
 var pbkdf2 = require('pbkdf2').pbkdf2Sync
@@ -455,7 +440,7 @@ module.exports = {
   }
 }
 
-},{"./wordlists/chinese_simplified.json":7,"./wordlists/chinese_traditional.json":8,"./wordlists/english.json":9,"./wordlists/french.json":10,"./wordlists/italian.json":11,"./wordlists/japanese.json":12,"./wordlists/spanish.json":13,"create-hash":16,"pbkdf2":25,"randombytes":30,"safe-buffer":32,"unorm":41}],7:[function(require,module,exports){
+},{"./wordlists/chinese_simplified.json":5,"./wordlists/chinese_traditional.json":6,"./wordlists/english.json":7,"./wordlists/french.json":8,"./wordlists/italian.json":9,"./wordlists/japanese.json":10,"./wordlists/spanish.json":11,"create-hash":16,"pbkdf2":25,"randombytes":30,"safe-buffer":32,"unorm":41}],5:[function(require,module,exports){
 module.exports=[
   "的",
   "一",
@@ -2507,7 +2492,7 @@ module.exports=[
   "歇"
 ]
 
-},{}],8:[function(require,module,exports){
+},{}],6:[function(require,module,exports){
 module.exports=[
   "的",
   "一",
@@ -4559,7 +4544,7 @@ module.exports=[
   "歇"
 ]
 
-},{}],9:[function(require,module,exports){
+},{}],7:[function(require,module,exports){
 module.exports=[
   "abandon",
   "ability",
@@ -6611,7 +6596,7 @@ module.exports=[
   "zoo"
 ]
 
-},{}],10:[function(require,module,exports){
+},{}],8:[function(require,module,exports){
 module.exports=[
   "abaisser",
   "abandon",
@@ -8663,7 +8648,7 @@ module.exports=[
   "zoologie"
 ]
 
-},{}],11:[function(require,module,exports){
+},{}],9:[function(require,module,exports){
 module.exports=[
   "abaco",
   "abbaglio",
@@ -10715,7 +10700,7 @@ module.exports=[
   "zuppa"
 ]
 
-},{}],12:[function(require,module,exports){
+},{}],10:[function(require,module,exports){
 module.exports=[
   "あいこくしん",
   "あいさつ",
@@ -12767,7 +12752,7 @@ module.exports=[
   "われる"
 ]
 
-},{}],13:[function(require,module,exports){
+},{}],11:[function(require,module,exports){
 module.exports=[
   "ábaco",
   "abdomen",
@@ -14819,7 +14804,71 @@ module.exports=[
   "zurdo"
 ]
 
-},{}],14:[function(require,module,exports){
+},{}],12:[function(require,module,exports){
+var basex = require('base-x')
+var ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
+
+module.exports = basex(ALPHABET)
+
+},{"base-x":2}],13:[function(require,module,exports){
+(function (Buffer){
+'use strict'
+
+var base58 = require('bs58')
+var createHash = require('create-hash')
+
+// SHA256(SHA256(buffer))
+function sha256x2 (buffer) {
+  var tmp = createHash('sha256').update(buffer).digest()
+  return createHash('sha256').update(tmp).digest()
+}
+
+// Encode a buffer as a base58-check encoded string
+function encode (payload) {
+  var checksum = sha256x2(payload)
+
+  return base58.encode(Buffer.concat([
+    payload,
+    checksum
+  ], payload.length + 4))
+}
+
+function decodeRaw (buffer) {
+  var payload = buffer.slice(0, -4)
+  var checksum = buffer.slice(-4)
+  var newChecksum = sha256x2(payload)
+
+  if (checksum[0] ^ newChecksum[0] |
+      checksum[1] ^ newChecksum[1] |
+      checksum[2] ^ newChecksum[2] |
+      checksum[3] ^ newChecksum[3]) return
+
+  return payload
+}
+
+// Decode a base58-check encoded string to a buffer, no result if checksum is wrong
+function decodeUnsafe (string) {
+  var buffer = base58.decodeUnsafe(string)
+  if (!buffer) return
+
+  return decodeRaw(buffer)
+}
+
+function decode (string) {
+  var buffer = base58.decode(string)
+  var payload = decodeRaw(buffer)
+  if (!payload) throw new Error('Invalid checksum')
+  return payload
+}
+
+module.exports = {
+  encode: encode,
+  decode: decode,
+  decodeUnsafe: decodeUnsafe
+}
+
+}).call(this,require("buffer").Buffer)
+},{"bs58":12,"buffer":88,"create-hash":16}],14:[function(require,module,exports){
 /*!
  * The buffer module from node.js, for the browser.
  *
@@ -16535,7 +16584,7 @@ function numberIsNaN (obj) {
   return obj !== obj // eslint-disable-line no-self-compare
 }
 
-},{"base64-js":5,"ieee754":20}],15:[function(require,module,exports){
+},{"base64-js":3,"ieee754":20}],15:[function(require,module,exports){
 var Buffer = require('safe-buffer').Buffer
 var Transform = require('stream').Transform
 var StringDecoder = require('string_decoder').StringDecoder
@@ -25895,8 +25944,8 @@ PEMEncoder.prototype.encode = function encode(data, options) {
 };
 
 },{"./der":54,"inherits":142}],57:[function(require,module,exports){
-arguments[4][5][0].apply(exports,arguments)
-},{"dup":5}],58:[function(require,module,exports){
+arguments[4][3][0].apply(exports,arguments)
+},{"dup":3}],58:[function(require,module,exports){
 (function (module, exports) {
   'use strict';
 
@@ -42773,4 +42822,4 @@ exports.createContext = Script.createContext = function (context) {
     return copy;
 };
 
-},{"indexof":141}]},{},[4]);
+},{"indexof":141}]},{},[1]);
