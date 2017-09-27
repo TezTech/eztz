@@ -7,7 +7,8 @@ Easy Tezos key generator and utility tool - It's eztz! Live demo: http://173.254
 In browser, just include eztz.js and you're good to go.
 
 ### Building
-Run browserify main.js -o eztz.js to rebuild the bundle.
+Rebuild bundle using the following code (requires browserify):
+##### browserify main.js -o eztz.js
 
 ### Usage
 Include the eztz.js file and run the eztz_ready function as per below:
