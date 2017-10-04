@@ -127,7 +127,6 @@ window.eztz = {
         return {
             mnemonic : m,
             passphrase : p,
-            salt : ss,
             sk : o(kp.privateKey, prefix.edsk),
             pk : o(kp.publicKey, prefix.edpk),
             pkh : o(sodium.crypto_generichash(20, kp.publicKey), prefix.tz1),
