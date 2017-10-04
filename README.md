@@ -111,7 +111,7 @@ https://github.com/bitcoinjs/bip39 (for mnemonic code)
 https://github.com/crypto-browserify/pbkdf2 (for passphrase hashing)
 https://github.com/feross/buffer (for browser buffer)
 
-##### Shout out to Tezzigator for helping me with the operation signing functionality.
+**Shout out to Tezzigator for helping me with the operation signing functionality. **
 
 ### License
 MIT
