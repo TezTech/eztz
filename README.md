@@ -3,15 +3,15 @@ Easy Tezos key generator, operation signing and utility tool - It's eztz! Live d
 
 #### *** Disclaimer - all keys generated should be treated as live. Please use the tool offline, and endavour to keep any input/output data secure and private ***
 
-### Installation
+## Installation
 In browser, just include eztz.js and you're good to go.
 
-### Building
+## Building
 Rebuild bundle using the following code (requires browserify):
 
 __browserify main.js -o eztz.js__
 
-### Usage
+## Usage
 Include the eztz.js file and run the eztz_ready function as per below:
 ```html
 <script src="./eztz.js"></script>
@@ -21,7 +21,7 @@ Include the eztz.js file and run the eztz_ready function as per below:
     console.log(keys);
 </script>
 ```
-### Available Functions
+## Available Functions
 
 #### eztz.prefix
 Object consisting of prefixes (base58check) used for Secret key, Public key, Public key hash
@@ -53,6 +53,19 @@ Returns an object with generated keys and associated data in a non-dertministic 
 ```
 #### eztz.generateMnemonic()
 Returns a mnemonic to be used for the key generator (string)
+
+#### eztz.generateKeysSalted(mnemonic, passphrase)
+Returns an object with generated keys and associated data in a deterministic way using a random salt
+```javascript
+{
+    mnemonic : mnemonic, // The mneomic used
+    passphrase : passphrase, // The passphrase used
+    salt : salt, // The random generated salt
+    sk : sk, // The secret/private key hash (sk - starts with edsk)
+    pk : pk, // The public key hash (pk - starts with edpk)
+    pkh : pkh, // The public key hash (pkh or id - starts with tz1)
+}
+```
 
 #### eztz.generateKeys(mnemonic, passphrase)
 Returns an object with generated keys and associated data in a deterministic way
@@ -95,18 +108,18 @@ eztz.sendOperation(operation, keys, 0, function(r){
 });
 ```
 
-### Future Development
+## Future Development
 We will be working on this library on a regular basis, with hopes of adding more functiliaty (message signing/verification etc).
 
-### Credits
+## Author
 Stephen Andrews
 
-### Support Us
+## Support Us
 Please consider donating to help us develop this, and other Tezos related tools
 
 Bitcoin: 1KSiyfgs5XwTZjaLpmCTHxonsyXMx383P1
 
-### Credits
+## Credits
 https://github.com/bitcoinjs/bs58check (for base58check encode/decode)
 
 https://github.com/jedisct1/libsodium.js (for all crypto related functions)
@@ -119,5 +132,5 @@ https://github.com/feross/buffer (for browser buffer)
 
 __Shout out to Tezzigator for helping me with the operation signing functionality.__
 
-### License
+## License
 MIT
