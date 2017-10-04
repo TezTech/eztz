@@ -8,7 +8,8 @@ In browser, just include eztz.js and you're good to go.
 
 ### Building
 Rebuild bundle using the following code (requires browserify):
-##### browserify main.js -o eztz.js
+
+__browserify main.js -o eztz.js__
 
 ### Usage
 Include the eztz.js file and run the eztz_ready function as per below:
@@ -102,6 +103,7 @@ Stephen Andrews
 
 ### Support Us
 Please consider donating to help us develop this, and other Tezos related tools
+
 Bitcoin: 1KSiyfgs5XwTZjaLpmCTHxonsyXMx383P1
 
 ### Credits
