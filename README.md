@@ -108,9 +108,13 @@ Bitcoin: 1KSiyfgs5XwTZjaLpmCTHxonsyXMx383P1
 
 ### Credits
 https://github.com/bitcoinjs/bs58check (for base58check encode/decode)
+
 https://github.com/jedisct1/libsodium.js (for all crypto related functions)
+
 https://github.com/bitcoinjs/bip39 (for mnemonic code)
+
 https://github.com/crypto-browserify/pbkdf2 (for passphrase hashing)
+
 https://github.com/feross/buffer (for browser buffer)
 
 __Shout out to Tezzigator for helping me with the operation signing functionality.__
