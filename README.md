@@ -1,5 +1,5 @@
 # eztz
-Easy Tezos key generator, operation signing and utility tool - It's eztz! Live demo: http://173.254.236.122/keygen.html
+Easy Tezos key generator, operation signing and utility tool - It's eztz! [Live demo](https://stephenandrews.github.io/eztz/)
 
 #### *** Disclaimer - all keys generated should be treated as live. Please use the tool offline, and endavour to keep any input/output data secure and private ***
 
