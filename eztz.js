@@ -107,10 +107,22 @@ window.eztz = {
             pkh : o(sodium.crypto_generichash(20, kp.publicKey), prefix.tz1),
         };
     },
-    generateKeys : function(m,p){
+    generateKeysSalted : function(m,p){
         var ss = Math.random().toString(36).slice(2);
         var pp = pbkdf2.pbkdf2Sync(p, ss, 0, 32, 'sha512').toString();
         var s = bip39.mnemonicToSeed(m, pp).slice(0, 32);
+        var kp = sodium.crypto_sign_seed_keypair(s);
+        return {
+            mnemonic : m,
+            passphrase : p,
+            salt : ss,
+            sk : o(kp.privateKey, prefix.edsk),
+            pk : o(kp.publicKey, prefix.edpk),
+            pkh : o(sodium.crypto_generichash(20, kp.publicKey), prefix.tz1),
+        };
+    },
+    generateKeys : function(m,p){
+        var s = bip39.mnemonicToSeed(m, p).slice(0, 32);
         var kp = sodium.crypto_sign_seed_keypair(s);
         return {
             mnemonic : m,
