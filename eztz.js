@@ -22464,6 +22464,7 @@ window.eztz = {
     encodeb58 : o,
     decodeb58 : p,
     setRpcUrl : function(u){ rpcurl = u; },
+    resetRpcUrl : function(u){ rpcurl = 'http://173.254.236.122/rpc.php?url='; },
     sendOperation : function(operation, keys, fee, r){
         try{
         tz_rpc('/blocks/head', {}, function(f){ 
