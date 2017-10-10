@@ -27,12 +27,22 @@ tz_rpc = function(e, o, f){
     http.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
     http.onreadystatechange = function() {
         if(http.readyState == 4 && http.status == 200) {
-            var r = JSON.parse(http.responseText);
-            if (typeof r.ok != 'undefined') r = r.ok;
-            f(r);
+           if (http.responseText){
+                var r = JSON.parse(http.responseText);
+                if (typeof r.ok != 'undefined') r = r.ok;
+                f(r);
+           } else {
+               f(0);
+           }
         }
     }
     http.send(JSON.stringify(o));
+},
+hexNonce = function(length) {
+  var chars = '0123456789abcedf';
+  var hex = '';
+  while(length--) hex += chars[(Math.random() * 16) | 0];
+  return hex;
 },
 buf2hex = function(buffer) {
   return Array.prototype.map.call(new Uint8Array(buffer), x => ('00' + x.toString(16)).slice(-2)).join('');
@@ -44,6 +54,7 @@ hex2buf = function(hex){
 };
 var eztz_ready_function = false,
 rpcurl = 'http://173.254.236.122/rpc.php?url=';
+window.sodium = sodium;
 window.eztz_ready = function(e){
     if (typeof window.eztz != 'undefined') {
         e(window.eztz);
@@ -78,7 +89,7 @@ window.eztz = {
                         var ok58 = o(ok, prefix.edsig);
                         var sopbytes = opbytes + buf2hex(ok);
                         
-                        var operationHash = o(sodium.crypto_generichash(32, hex2buf(sopbytes), 'uint8array'), prefix.o);
+                        var operationHash = o(sodium.crypto_generichash(32, hex2buf(sopbytes)), prefix.o);
                         tz_rpc('/blocks/prevalidation/proto/helpers/apply_operation', {
                             "pred_block": pred_block,
                             "operation_hash": operationHash,
@@ -145,6 +156,61 @@ window.eztz = {
         };
     },
 };
+
+//Alpha only functions
+window.eztz.alphanet = {};
+window.eztz.alphanet.getFreeTez = function(toAddress, r){
+    // Generate some random keys
+    var keys = eztz.generateKeysNoSeed();
+    //Originate a free account using the faucet operation
+    try{
+        tz_rpc('/blocks/head', {}, function(f){ 
+            var head = f;
+            tz_rpc('/blocks/prevalidation/predecessor', {}, function(f){ 
+                var pred_block = f.predecessor;
+                tz_rpc('/blocks/prevalidation/proto/helpers/forge/operations', {
+                    "net_id": head.net_id,
+                    "branch": pred_block,
+                    "operations": [{
+                        "kind" : "faucet",
+                        "id" : keys.pkh,
+                        "nonce" : hexNonce(32)
+                    }]
+                }, function(f){ 
+                    var opbytes = f.operation;
+                    var operationHash = o(sodium.crypto_generichash(32, hex2buf(opbytes)), prefix.o);
+                    tz_rpc('/blocks/prevalidation/predecessor', {}, function(f){ 
+                        var pred_block = f.predecessor;
+                        tz_rpc('/blocks/prevalidation/proto/helpers/apply_operation', {
+                            "pred_block": pred_block,
+                            "operation_hash": operationHash,
+                            "forged_operation": opbytes,
+                        }, function(f){
+                            var npkh = f.contracts[0];
+                            tz_rpc('/inject_operation', {
+                               "signedOperationContents" : opbytes,
+                                "force" : false,
+                            }, function(f){
+                                tz_rpc('/blocks/prevalidation/proto/context/contracts/'+npkh+'/manager', {}, function(f){
+                                    //Transfer from free account
+                                    keys.pkh = npkh;
+                                    var operation = {
+                                      "kind": "transaction",
+                                      "amount": 10000000,
+                                      "destination": toAddress
+                                    };
+                                    eztz.sendOperation(operation, keys, 0, r);
+                                });
+                            });
+                        });
+                    });
+                });
+            });
+        });
+    } catch (e){
+        r(e);
+    }
+}
 if (eztz_ready_function){
     eztz_ready_function(window.eztz);
 }
