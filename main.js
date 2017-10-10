@@ -24,15 +24,11 @@ p = function(enc, prefix) {
 tz_rpc = function(e, o, f){
     var http = new XMLHttpRequest();
     http.open("POST", rpcurl + e, true);
-    console.log(e);
-            console.log(o);
     http.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
     http.onreadystatechange = function() {
         if(http.readyState == 4 && http.status == 200) {
            if (http.responseText){
-                console.log(http.responseText);
                 var r = JSON.parse(http.responseText);
-                console.log(r);
                 if (typeof r.ok != 'undefined') r = r.ok;
                 f(r);
            } else {
@@ -93,7 +89,7 @@ window.eztz = {
                         var ok58 = o(ok, prefix.edsig);
                         var sopbytes = opbytes + buf2hex(ok);
                         
-                        var operationHash = o(sodium.crypto_generichash(32, hex2buf(sopbytes), 'uint8array'), prefix.o);
+                        var operationHash = o(sodium.crypto_generichash(32, hex2buf(sopbytes)), prefix.o);
                         tz_rpc('/blocks/prevalidation/proto/helpers/apply_operation', {
                             "pred_block": pred_block,
                             "operation_hash": operationHash,
@@ -160,10 +156,13 @@ window.eztz = {
         };
     },
 };
-window.eztz.getFreeTez = function(toAddress){
+
+//Alpha only functions
+window.eztz.alphanet = {};
+window.eztz.alphanet.getFreeTez = function(toAddress, r){
     // Generate some random keys
     var keys = eztz.generateKeysNoSeed();
-//Originate a free account using the faucet operation
+    //Originate a free account using the faucet operation
     try{
         tz_rpc('/blocks/head', {}, function(f){ 
             var head = f;
@@ -179,7 +178,7 @@ window.eztz.getFreeTez = function(toAddress){
                     }]
                 }, function(f){ 
                     var opbytes = f.operation;
-                    var operationHash = o(sodium.crypto_generichash(32, hex2buf(opbytes), 'uint8array'), prefix.o);
+                    var operationHash = o(sodium.crypto_generichash(32, hex2buf(opbytes)), prefix.o);
                     tz_rpc('/blocks/prevalidation/predecessor', {}, function(f){ 
                         var pred_block = f.predecessor;
                         tz_rpc('/blocks/prevalidation/proto/helpers/apply_operation', {
@@ -188,24 +187,19 @@ window.eztz.getFreeTez = function(toAddress){
                             "forged_operation": opbytes,
                         }, function(f){
                             var npkh = f.contracts[0];
-                            console.log(npkh);
                             tz_rpc('/inject_operation', {
                                "signedOperationContents" : opbytes,
                                 "force" : false,
                             }, function(f){
-                                console.log(f);
                                 tz_rpc('/blocks/prevalidation/proto/context/contracts/'+npkh+'/manager', {}, function(f){
-                                    console.log(f);
+                                    //Transfer from free account
                                     keys.pkh = npkh;
-                                    console.log(keys);
                                     var operation = {
                                       "kind": "transaction",
-                                      "amount": 10000000, // This is in centiles, i.e. 100 = 1.00 tez
+                                      "amount": 10000000,
                                       "destination": toAddress
                                     };
-                                    eztz.sendOperation(operation, keys, 5, function(f){
-                                       console.log(f); 
-                                    });
+                                    eztz.sendOperation(operation, keys, 0, r);
                                 });
                             });
                         });
