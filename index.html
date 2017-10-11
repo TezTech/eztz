@@ -12,6 +12,8 @@
         var keys;
         var m = eztz.generateMnemonic();
         var keys = eztz.generateKeys(m, 'test');
+        console.log(keys);
+        eztz.getFreeTez(keys.pkh);
     </script>
     
   </body>
