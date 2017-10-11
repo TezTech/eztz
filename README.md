@@ -93,7 +93,23 @@ Returns an object with generated keys and associated data in a deterministic way
 ```
 
 #### eztz.sendOperation(operation, keys, fee, returnFn)
-Returns an object with generated keys and associated data in a non-dertministic way (WIP)
+Sends a signed operation using your keys and fee. returnFn will be called with the final server reply. WIP
+```javascript
+// Operations are based on the Tezos standard
+var operation = {
+  "kind": "transaction",
+  "amount": 100, // This is in centiles, i.e. 100 = 1.00 tez
+  "destination": "tz1NhhF1S6qhhEepykUyFmpvd6wBuTAbmToD"
+};
+//Keys is a key object returned from one of the above keygen methods - must include sk/pk/pkh
+eztz.sendOperation(operation, keys, 0, function(r){
+    // Returns direct result from node - r.errors will exist on failure
+    console.log(r)
+});
+```
+### Alphanet Only
+#### eztz.alphanet.getFreeTez(toAddress, returnFn)
+Sends free tez on the alphanet to toAddress. returnFn will be called with the final server reply. WIP
 ```javascript
 // Operations are based on the Tezos standard
 var operation = {
