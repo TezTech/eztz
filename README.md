@@ -1,9 +1,9 @@
 # eztz - Javascript API library for Tezos
-This library is compatible with the Tezos blockchain, implementing communication with the JSON RPC API and providing key generation, signing, verification, and contract interfaction. Try our [Live demo](https://stephenandrews.github.io/eztz/) - it's eztz!
+This library is compatible with the Tezos blockchain, implementing communication with the JSON RPC API and providing key generation, signing, verification, and contract interaction. Try our [Live demo](https://stephenandrews.github.io/eztz/) - it's eztz!
 
 You can checkout our [Documentation](https://github.com/stephenandrews/eztz/wiki/Documentation), or follow installation below.
 
-**By default, eztz will connect to https://tezrpc.me - a network of community supplied Tezos nodes. You can switch this to use your own local node, or a node of your choosing.**
+**By default, eztz will connect to https://tezrpc.me - a network of community supplied Tezos nodes. You can switch this to use your own local node, or a node of your choosing, via eztz.node.setProvider(url).**
 
 ## Installation
 In browser, just include eztz.js and you're good to go.
