@@ -25,18 +25,6 @@ utility = {
       n = n.slice(prefix.length);
       return n;
   },
-  generateMnemonic : function(){
-    return library.bip39.generateMnemonic(160)
-  },
-  checkAddress : function(a){
-    try {
-      this.b58cdecode(a, prefix.tz1);
-      return true;
-    } 
-    catch (e){
-      return false;
-    }
-  },
   buf2hex : function(buffer) {
     return Array.prototype.map.call(new Uint8Array(buffer), x => ('00' + x.toString(16)).slice(-2)).join('');
   },
@@ -53,6 +41,18 @@ utility = {
   }
 },
 crypto = {
+  generateMnemonic : function(){
+    return library.bip39.generateMnemonic(160)
+  },
+  checkAddress : function(a){
+    try {
+      utility.b58cdecode(a, prefix.tz1);
+      return true;
+    } 
+    catch (e){
+      return false;
+    }
+  },
   generateKeysNoSeed : function(){
         var kp = library.sodium.crypto_sign_keypair();
         return {
