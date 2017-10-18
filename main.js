@@ -28,8 +28,14 @@ utility = {
   generateMnemonic : function(){
     return library.bip39.generateMnemonic(160)
   },
-  checkAddress : function(a){//TODO
-    return true;
+  checkAddress : function(a){
+    try {
+      this.b58cdecode(a, prefix.tz1);
+      return true;
+    } 
+    catch (e){
+      return false;
+    }
   },
   buf2hex : function(buffer) {
     return Array.prototype.map.call(new Uint8Array(buffer), x => ('00' + x.toString(16)).slice(-2)).join('');
