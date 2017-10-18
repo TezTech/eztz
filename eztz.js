@@ -27,8 +27,14 @@ utility = {
       return n;
   },
   buf2hex : function(buffer) {
-    return Array.prototype.map.call(new Uint8Array(buffer), x => ('00' + x.toString(16)).slice(-2)).join('');
-  },
+		var byteArray = new Uint8Array(buffer), hexParts = [];
+		for(var i = 0; i < byteArray.length; i++) {
+			var hex = byteArray[i].toString(16);
+			var paddedHex = ('00' + hex).slice(-2);
+			hexParts.push(paddedHex);
+		}
+		return hexParts.join('');
+	},
   hex2buf : function(hex){
       return new Uint8Array(hex.match(/[\da-f]{2}/gi).map(function (h) {
         return parseInt(h, 16)

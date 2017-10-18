@@ -9,7 +9,23 @@
 
     <script src="./eztz.js"></script>
     <script>
-      //Test to come
+			//Generate mnemonic
+      var m = eztz.crypto.generateMnemonic();
+			console.log(m);
+			
+			//Generate keys
+      var keys = eztz.crypto.generateKeys(m, "test");
+			console.log(keys);
+			
+			//Get free tez from faucet
+			eztz.alphanet.faucet(keys.pkh)
+			.then(function(r){
+			//Show balance
+				return eztz.rpc.getBalance(keys.pkh);
+			})
+			.then(function(r){
+				console.log(r);
+			});
     </script>
     
   </body>
