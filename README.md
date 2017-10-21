@@ -14,7 +14,7 @@ In browser, just include eztz.js and you're good to go.
 Rebuild bundle using the following code (requires browserify):
 
 ```
-browserify main.js -o eztz.js
+npm run-script build
 ```
 
 ## Usage

@@ -138,8 +138,12 @@ node = {
           if(http.status == 200) {
              if (http.responseText){
                   var r = JSON.parse(http.responseText);
-                  if (typeof r.ok != 'undefined') r = r.ok;
-                  resolve(r);
+                  if (typeof r.error != 'undefined'){
+                   reject(r.error);
+                  } else {
+                    if (typeof r.ok != 'undefined') r = r.ok;
+                    resolve(r);
+                  }
              } else {
                  reject("Empty response returned");
              }
