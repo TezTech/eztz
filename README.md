@@ -18,7 +18,7 @@ In browser, just include eztz.js and you're good to go.
 Rebuild bundle using the following code (requires browserify):
 
 ```
-yarn build
+npm run-script build
 ```
 
 ## Usage
@@ -35,16 +35,18 @@ Include the eztz.js file and use the eztz object directly:
 ```
 
 ## Future Development
-We will be working on this library on a regular basis, with hopes of adding more functiliaty (message signing/verification etc).
+Our current goals are:
+* Complete RPC object to encompass the entire RPC API spec
+* Work on Contract object, to allow better integration with smart contracts (deployment, sending to, and reading storage)
 
 ## Contribute
-Please feel free to contribute - I will merge and pull requests as soon as I've gone through the changes.
+Please feel free to contribute - I will merge any pull requests as soon as I've gone through the changes.
 
 ## Author
 Stephen Andrews
 
 ## Support Us
-Please consider donating to help me develop this and other Tezos related tools
+Please consider donating to help me develop this and other Tezos related tools, I currently rely on the kindness of others.
 
 Bitcoin: 1KSiyfgs5XwTZjaLpmCTHxonsyXMx383P1
 
