@@ -36,13 +36,13 @@ Our current goals are:
 * Work on Contract object, to allow better integration with smart contracts (deployment, sending to, and reading storage)
 
 ## Contribute
-Please feel free to contribute - I will merge and pull requests as soon as I've gone through the changes.
+Please feel free to contribute - I will merge any pull requests as soon as I've gone through the changes.
 
 ## Author
 Stephen Andrews
 
 ## Support Us
-Please consider donating to help me develop this and other Tezos related tools
+Please consider donating to help me develop this and other Tezos related tools, I currently rely on the kindness of others.
 
 Bitcoin: 1KSiyfgs5XwTZjaLpmCTHxonsyXMx383P1
 
