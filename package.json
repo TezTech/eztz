@@ -5,5 +5,13 @@
     "buffer": "^5.0.7",
     "libsodium-wrappers": "^0.5.4",
     "pbkdf2": "^3.0.14"
+  },
+  "scripts": {
+    "test": "jest",
+    "build": "browserify main.js -o eztz.js"
+  },
+  "devDependencies": {
+    "browserify": "^14.4.0",
+    "jest": "^21.2.1"
   }
 }
