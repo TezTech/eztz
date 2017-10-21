@@ -121,17 +121,18 @@ crypto = {
   },
 }
 node = {
+  activeProvider: defaultProvider,
   setProvider : function(u){
-    activeProvider = u;
+    node.activeProvider = u;
   },
   resetProvider : function(){
-    activeProvider = defaultProvider;
+    node.activeProvider = defaultProvider;
   },
   query :function(e, o){
     if (typeof o == 'undefined') o = {};
     return new Promise(function (resolve, reject) {
       var http = new XMLHttpRequest();
-      http.open("POST", activeProvider + e, true);
+      http.open("POST", node.activeProvider + e, true);
       http.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
       http.onload = function() {
           if(http.status == 200) {
@@ -205,7 +206,6 @@ rpc = {
 contract = {//TODO
   
 };
-var activeProvider = defaultProvider;
 //Expose library
 window.eztz = {
   library : library,
@@ -269,3 +269,8 @@ window.eztz.alphanet.faucet = function(toAddress){
       return rpc.sendOperation(operation, keys, 0);
   });
 }
+
+module.exports = {
+  defaultProvider,
+  eztz: window.eztz,
+};
