@@ -3,12 +3,13 @@
     "bip39": "^2.4.0",
     "bs58check": "^2.0.2",
     "buffer": "^5.0.7",
+    "codecov": "^2.3.1",
     "libsodium-wrappers": "^0.5.4",
     "pbkdf2": "^3.0.14"
   },
   "scripts": {
     "test": "jest",
-    "coverage": "jest --coverage",
+    "coverage": "jest --coverage && codecov",
     "build": "browserify main.js -o eztz.js"
   },
   "devDependencies": {
