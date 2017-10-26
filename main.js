@@ -133,7 +133,6 @@ node = {
     return new Promise(function (resolve, reject) {
       var http = new XMLHttpRequest();
       http.open("POST", node.activeProvider + e, true);
-      http.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
       http.onload = function() {
           if(http.status == 200) {
              if (http.responseText){
