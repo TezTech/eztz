@@ -1,7 +1,7 @@
 # eztz - Javascript API library for Tezos
 
 [![Build
-Status](https://travis-ci.org/prashantpawar/eztz.svg?branch=master)](https://travis-ci.org/prashantpawar/eztz)
+Status](https://travis-ci.org/stephenandrews/eztz.svg?branch=master)](https://travis-ci.org/stephenandrews/eztz)
 
 This library is compatible with the Tezos blockchain, implementing communication with the JSON RPC API and providing key generation, signing, verification, and contract interaction. Try our [Live demo](https://stephenandrews.github.io/eztz/) - it's eztz!
 
