@@ -15,7 +15,7 @@ In browser, just include eztz.js and you're good to go.
 **NPM plugin in development**
 
 ## Building
-Rebuild bundle using the following code (requires browserify):
+Rebuild bundle using the following code (requires webpack):
 
 ```
 npm run-script build
