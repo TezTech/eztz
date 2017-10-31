@@ -249,6 +249,42 @@ node = {
   }
 },
 rpc = {
+  account : function(keys){
+    var head, pred_block, opbytes;
+    return node.query('/blocks/head')
+    .then(function(f){
+      head = f;
+      pred_block = head.predecessor;
+      return node.query('/blocks/prevalidation/proto/helpers/forge/operations', {
+          "net_id": head.net_id,
+          "branch": pred_block,
+          "operations": [{
+              "kind" : "faucet",
+              "id" : keys.pkh,
+              "nonce" : utility.hexNonce(32)
+          }]
+      });
+    })
+    .then(function(f){ 
+      opbytes = f.operation;
+      var operationHash = utility.b58cencode(library.sodium.crypto_generichash(32, utility.hex2buf(opbytes)), prefix.o);
+      return node.query('/blocks/prevalidation/proto/helpers/apply_operation', {
+          "pred_block": pred_block,
+          "operation_hash": operationHash,
+          "forged_operation": opbytes,
+      });
+    })
+    .then(function(f){
+      npkh = f.contracts[0];
+      return node.query('/inject_operation', {
+         "signedOperationContents" : opbytes,
+          "force" : false,
+      });
+    })
+    .then(function(f){
+      return npkh
+    });
+  },
   getBalance : function(pkh){
     return node.query("/blocks/prevalidation/proto/context/contracts/"+pkh+"/balance");
   },
@@ -311,16 +347,17 @@ contract = {
   },
   watch : function(contract, timeout, cb){
     var storage = [];
-    return setInterval(function(){
+    var ct = function(){
       eztz.node.query("/blocks/head/proto/context/contracts/"+contract).then(function(r){
         var ns = eztz.utility.tzjson2arr(r.script.storage.storage);
         if (JSON.stringify(storage) != JSON.stringify(ns)){
           storage = ns;
-          console.log("Found new watch", storage);
           cb(storage);
         }
       });
-    }, timeout*1000);
+    }
+    ct();
+    return setInterval(ct, timeout*1000);
   },
   send : function(contract, keys, amount, parameter, fee){
     return eztz.rpc.sendOperation({
