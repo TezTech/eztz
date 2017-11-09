@@ -6,6 +6,13 @@ const _sodium = require('libsodium-wrappers');
         return;
     }
     var match = process.argv[2];
+    var ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
+    for(var i = 0; i < match.length; i++){
+        if (ALPHABET.indexOf(match[i]) < 0){
+            console.log("Your search term is not valid - please ensure search term only includes b58 valid characters: " + ALPHABET);
+            return;
+        }
+    }
     await _sodium.ready;
     var XMLHttpRequest = require("xmlhttprequest").XMLHttpRequest;
     var ee = require("./main.js");
