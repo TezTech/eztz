@@ -1,4 +1,98 @@
 //TODO - move functions somewhere else
+var _parseScriptCode = function mm (mi){
+  var bl = 0;
+  var pl = 0;
+  var isString = false;
+  var sopen = false;
+  var escaped = false;
+  var hasB = false;
+  var ins = '';
+  var ret = [];
+  var args = [];
+  var val = "";
+  mi += ";";
+  for(var i = 0; i < mi.length; i++){
+    if (escaped){ // Skip if escapd
+      val += mi[i];
+      escaped = false;
+      continue;
+    }
+    else if (mi[i] == " " && bl == 0 && pl == 0 && sopen == false){
+      if (val){
+        if (ins) {
+          if (isString){
+            val = {"string" : val};
+          } else if (val === parseInt(val).toString()) {
+            val = {"int" : val};
+          }
+          args.push(val);
+        } else {
+          ins = val;
+        }
+        val = '';
+      }
+      continue;
+    }
+    else if (mi[i] == ";" && bl == 0 && pl == 0 && sopen == false){
+      if (val){
+        if (ins || hasB){
+          var vo = {};
+          if (args.length){
+            if (isString){
+              val = {"string" : val};
+            } else if (val === parseInt(val).toString()) {
+              val = {"int" : val};
+            }
+            args.push(val);
+            vo[ins] = [args, {}];
+          } else if (ins){
+            vo[ins] = [[_parseScriptCode(val)], {}];
+          } else {
+            vo = _parseScriptCode(val);
+          }
+          ret.push(vo);
+        } else {
+          ret.push(val);
+        }
+        val = '';
+        ins = '';
+        hasB = false;
+        args = [];
+      }
+      continue;
+    }
+    else if (mi[i] == '"' && sopen) {
+      isString = true;
+      sopen = false;
+      continue;
+    }
+    else if (mi[i] == '"' && !sopen) {
+      sopen = true;
+      continue;
+    }
+    else if (mi[i] == '\\') escaped = true;
+    else if (mi[i] == "(" && !sopen) pl++;
+    else if (mi[i] == ")" && !sopen) pl--;
+    else if (mi[i] == "{" && !sopen) {
+      if (bl === 0){
+        hasB = true;
+        ins = val;
+        val = '';
+        bl++;  
+        continue;
+      }
+      bl++;  
+    }
+    else if (mi[i] == "}" && !sopen) {
+      bl--;
+      if (bl === 0){
+        continue;
+      }
+    }
+    val += mi[i];
+  }
+  return ret;
+}
 function _splitPair(p){
   var ret = [];
   if (typeof p.Pair == "undefined"){
@@ -134,7 +228,47 @@ utility = {
       return ret[0];
     }
   },
-  tzjson2arr : function(p){return _splitPair(p)}
+  tzjson2arr : function(p){return _splitPair(p)},
+  mlraw2json : function(mi){
+    var ret = {}, val = "", type = '', bl = 0, typemap = {
+      "parameter" : "argType",
+      "storage" : "retType",
+      "return" : "storageType",
+    };
+    for(var i = 0; i < mi.length; i++){
+      if (type == '' && mi[i] == " "){
+          val = val.trim();
+          if (val == "parameter" || val == "storage" || val == "return"){
+            type = utility.ml2tzjson(val);
+            val = '';
+            continue;
+          }
+      } else if ((type == "parameter" || type == "storage" || type == "return" ) && mi[i] == ";"){
+        
+        ret[typemap[type]] = val;
+        type = '';
+        val = '';
+        continue;
+      } else if (mi[i] == "{"){
+        if (type == '' && bl == 0 && val.trim() == 'code'){
+            type = 'code';
+            val = '';
+            continue;
+        }
+        bl++;
+      } else if (mi[i] == "}"){
+        if (bl == 0 && type == 'code'){
+          ret[type] = _parseScriptCode(val);
+          type = '';
+          val = '';
+          continue;
+        }
+        bl--;
+      }
+      val += mi[i];
+    }
+    return ret;
+  }
 },
 crypto = {
   generateMnemonic : function(){
