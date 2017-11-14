@@ -1,3 +1,4 @@
+if (typeof XMLHttpRequest == "undefined") XMLHttpRequest = require("xmlhttprequest").XMLHttpRequest;
 //TODO - move functions somewhere else
 var _parseScriptCode = function mm (mi){
   var bl = 0;
@@ -395,25 +396,6 @@ rpc = {
     return rpc.sendOperation(operation, keys, fee);
   },
   freeAccount : function(keys){
-    var _code = utility.mlraw2json(code), script = {
-      code : _code,
-      storage : {
-        storageType : _code.storageType,
-        storage : utility.ml2tzjson(init)
-      }
-    }, operation = {
-      "kind": "faucet",
-      "balance": amount.toFixed(2)*100,
-      "managerPubkey": keys.pkh,
-      "script": script,
-      "spendable": (typeof spendable != "undefined" ? spendable : false),
-      "delegatable": (typeof delegatable != "undefined" ? delegatable : false),
-      "delegate": (typeof delegate != "undefined" ? delegate : keys.pkh),
-    };
-    return rpc.sendOperation(operation, keys, fee);
-    
-    
-    
     var head, pred_block, opbytes;
     return node.query('/blocks/head')
     .then(function(f){
@@ -599,7 +581,7 @@ contract = {
   }
 };
 //Expose library
-window.eztz = {
+eztz = {
   library : library,
   prefix : prefix,
   utility : utility,
@@ -610,8 +592,8 @@ window.eztz = {
 };
 
 //Alpha only functions
-window.eztz.alphanet = {};
-window.eztz.alphanet.faucet = function(toAddress){
+eztz.alphanet = {};
+eztz.alphanet.faucet = function(toAddress){
   var keys = crypto.generateKeysNoSeed();
   var head, pred_block, opbytes, npkh;
   return node.query('/blocks/head')
@@ -658,8 +640,7 @@ window.eztz.alphanet.faucet = function(toAddress){
       return rpc.sendOperation(operation, keys, 0);
   });
 }
-
 module.exports = {
   defaultProvider,
-  eztz: window.eztz,
+  eztz: eztz,
 };
