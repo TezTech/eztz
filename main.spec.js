@@ -4,7 +4,7 @@ describe('eztz.node', () => {
   let eztz;
 
   beforeEach(() => {
-    main = require('./main');
+    main = require('./src/main');
     node = main.eztz.node;
   });
 
