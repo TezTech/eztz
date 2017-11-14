@@ -1,0 +1,24 @@
+{
+  "name": "eztz-cli",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "bin": {
+    "eztz": "./index.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "bip39": "^2.4.0",
+    "bs58check": "^2.0.2",
+    "crypto": "^1.0.1",
+    "get-random-values": "^1.2.0",
+    "jsonfile": "^4.0.0",
+    "libsodium-wrappers": "^0.7.2",
+    "pbkdf2": "^3.0.14",
+    "xmlhttprequest": "^1.8.0"
+  }
+}
