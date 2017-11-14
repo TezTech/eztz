@@ -43,7 +43,7 @@ Our current goals are:
 Please feel free to contribute - I will merge any pull requests as soon as I've gone through the changes.
 
 ## Author
-Stephen Andrews
+By Stephen Andrews, and produly developed at Cryptonomic!
 
 ## Support Us
 Please consider donating to help me develop this and other Tezos related tools, I currently rely on the kindness of others.
