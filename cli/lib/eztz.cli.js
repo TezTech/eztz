@@ -1,3 +1,4 @@
+//TEMP FIX
 if (typeof XMLHttpRequest == "undefined") XMLHttpRequest = require("xmlhttprequest").XMLHttpRequest;
 //TODO - move functions somewhere else
 var _parseScriptCode = function mm (mi){
