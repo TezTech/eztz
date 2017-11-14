@@ -1,9 +1,9 @@
 const UglifyJSPlugin = require('uglifyjs-webpack-plugin');
 
 module.exports = {
-  entry: "./main.js",
+  entry: "./src/main.js",
   output: {
-    filename: "eztz.js"
+    filename: "./dist/eztz.min.js"
   },
   node: {
     fs: 'empty'
