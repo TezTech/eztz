@@ -193,7 +193,7 @@ utility = {
         escaped = false;
         continue;
       }
-      else if (i == (mi.length - 1) || (mi[i] == " " && pl == 0 && sopen == false)){
+      else if ((i == (mi.length - 1) && sopen == false) || (mi[i] == " " && pl == 0 && sopen == false)){
         if (i == (mi.length - 1)) val += mi[i];
         if (val){
           if (val === parseInt(val).toString()) {
@@ -383,7 +383,37 @@ node = {
   }
 },
 rpc = {
-  account : function(keys){
+  account : function(keys, amount, spendable, delegatable, delegate, fee){
+    var operation = {
+      "kind": "origination",
+      "balance": amount.toFixed(2)*100,
+      "managerPubkey": keys.pkh,
+      "spendable": (typeof spendable != "undefined" ? spendable : true),
+      "delegatable": (typeof delegatable != "undefined" ? delegatable : true),
+      "delegate": (typeof delegate != "undefined" ? delegate : keys.pkh),
+    };
+    return rpc.sendOperation(operation, keys, fee);
+  },
+  freeAccount : function(keys){
+    var _code = utility.mlraw2json(code), script = {
+      code : _code,
+      storage : {
+        storageType : _code.storageType,
+        storage : utility.ml2tzjson(init)
+      }
+    }, operation = {
+      "kind": "faucet",
+      "balance": amount.toFixed(2)*100,
+      "managerPubkey": keys.pkh,
+      "script": script,
+      "spendable": (typeof spendable != "undefined" ? spendable : false),
+      "delegatable": (typeof delegatable != "undefined" ? delegatable : false),
+      "delegate": (typeof delegate != "undefined" ? delegate : keys.pkh),
+    };
+    return rpc.sendOperation(operation, keys, fee);
+    
+    
+    
     var head, pred_block, opbytes;
     return node.query('/blocks/head')
     .then(function(f){
@@ -419,30 +449,38 @@ rpc = {
       return npkh
     });
   },
-  getBalance : function(pkh){
-    return node.query("/blocks/prevalidation/proto/context/contracts/"+pkh+"/balance");
+  getBalance : function(tz1){
+    return node.query("/blocks/prevalidation/proto/context/contracts/"+tz1+"/balance");
   },
   getHead : function(){
     return node.query("/blocks/head");
   },
+  call : function(e, d){
+    return node.query(e, d);
+  },
   sendOperation : function(operation, keys, fee){
-    var head, counter, pred_block, sopbytes;
+    var head, counter, pred_block, sopbytes, returnedContracts;
     var promises = []
     promises.push(node.query('/blocks/head'));
-    promises.push(node.query('/blocks/prevalidation/proto/context/contracts/'+keys.pkh+'/counter'));
+    if (typeof fee != 'unfedined') {
+      promises.push(node.query('/blocks/prevalidation/proto/context/contracts/'+keys.pkh+'/counter'));
+    }
     return Promise.all(promises).then(function(f){
       head = f[0];
-      counter = f[1]+1;
       pred_block = head.predecessor;
-      return node.query('/blocks/prevalidation/proto/helpers/forge/operations', {
+      var opOb = {
           "net_id": head.net_id,
           "branch": pred_block,
           "source": keys.pkh,
-          "public_key": keys.pk,
-          "fee": fee,
-          "counter": counter,
           "operations": [operation]
-      });
+      }
+      if (typeof fee != 'unfedined') {
+        counter = f[1]+1;
+        opOb['fee'] = fee;
+        opOb['counter'] = counter;
+        opOb['public_key'] = keys.pk;
+      }
+      return node.query('/blocks/prevalidation/proto/helpers/forge/operations', opOb);
     })
     .then(function(f){ 
       var opbytes = f.operation;
@@ -457,15 +495,73 @@ rpc = {
       });
     })
     .then(function(f){
+      returnedContracts = f.contracts;
       return node.query('/inject_operation', {
          "signedOperationContents" : sopbytes, 
       });
+    })
+    .then(function(f){
+      f['contracts'] = returnedContracts;
+      return f
     });
   },
+  transfer : function(keys, from, to, amount, fee){
+    var operation = {
+      "kind" : "transaction",
+      "amount" : amount.toFixed(2)*100,
+      "destination" : to
+    };
+    return rpc.sendOperation(operation, {pk : keys.pk, pkh : from, sk : keys.sk}, fee);
+  },
+  originate : function(keys, amount, code, init, spendable, delegatable, delegate, fee){
+    var _code = utility.mlraw2json(code), script = {
+      code : _code,
+      storage : {
+        storageType : _code.storageType,
+        storage : utility.ml2tzjson(init)
+      }
+    }, operation = {
+      "kind": "origination",
+      "balance": amount.toFixed(2)*100,
+      "managerPubkey": keys.pkh,
+      "script": script,
+      "spendable": (typeof spendable != "undefined" ? spendable : false),
+      "delegatable": (typeof delegatable != "undefined" ? delegatable : false),
+      "delegate": (typeof delegate != "undefined" ? delegate : keys.pkh),
+    };
+    return rpc.sendOperation(operation, keys, fee);
+  },
+  setDelegate(keys, account, delegate, fee){
+    var operation = {
+      "kind": "delegation",
+      "delegate": (typeof delegate != "undefined" ? delegate : keys.pkh),
+    };
+    return rpc.sendOperation(operation, {pk : keys.pk, pkh : account, sk : keys.sk}, fee);
+  },
+  typecheckCode(code){
+    var _code = utility.mlraw2json(code);
+    return node.query("/blocks/head/proto/helpers/typecheck_code", _code);
+  },
+  typecheckData(data, type){
+    var check = {
+      data : utility.ml2tzjson(data),
+      type : utility.ml2tzjson(type)
+    };
+    return node.query("/blocks/head/proto/helpers/typecheck_data", check);
+  },
+  runCode(code, amount, input, storage, trace){
+    var ep = (trace ? 'trace_code' : 'run_code');
+    return node.query("/blocks/head/proto/helpers/" + ep, {
+      script : utility.mlraw2json(code),
+      amount : amount.toFixed(2)*100,
+      input : utility.ml2tzjson(input),
+      storage : utility.ml2tzjson(storage),
+    });
+  }
 },
 contract = {
-  originate : function(keys, amount, code, init){
-    //TODO
+  originate : function(keys, amount, code, init, spendable, delegatable, delegate){
+    rpc.originate(keys, amount, code, init, spendable, delegatable, delegate);
   },
   storage : function(contract){
     return new Promise(function (resolve, reject) {
