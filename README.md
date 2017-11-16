@@ -36,8 +36,8 @@ Include the eztz.js file and use the eztz object directly:
 
 ## Future Development
 Our current goals are:
-* Complete RPC object to encompass the entire RPC API spec
-* Work on Contract object, to allow better integration with smart contracts (deployment, sending to, and reading storage)
+* Fine tune library
+* Add additional tests
 
 ## Contribute
 Please feel free to contribute - I will merge any pull requests as soon as I've gone through the changes.
