@@ -133,7 +133,8 @@ function _process(p){
     return p;
   }
 }
-const defaultProvider = "https://tezrpc.me/api",
+const Buffer = require('buffer/').Buffer,
+defaultProvider = "https://tezrpc.me/api",
 library = {
   bs58check : require('bs58check'),
   sodium : require('libsodium-wrappers'),
