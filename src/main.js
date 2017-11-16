@@ -1,4 +1,4 @@
-if (typeof XMLHttpRequest == "undefined") XMLHttpRequest = require("xmlhttprequest").XMLHttpRequest;
+//TEMP FIX
 //TODO - move functions somewhere else
 var _parseScriptCode = function mm (mi){
   var bl = 0;
@@ -133,8 +133,7 @@ function _process(p){
     return p;
   }
 }
-const Buffer = require('buffer/').Buffer,
-defaultProvider = "https://tezrpc.me/api",
+const defaultProvider = "https://tezrpc.me/api",
 library = {
   bs58check : require('bs58check'),
   sodium : require('libsodium-wrappers'),
