@@ -1,4 +1,3 @@
-//TEMP FIX
 //TODO - move functions somewhere else
 var _parseScriptCode = function mm (mi){
   var bl = 0;
@@ -402,7 +401,6 @@ rpc = {
       head = f;
       pred_block = head.predecessor;
       return node.query('/blocks/prevalidation/proto/helpers/forge/operations', {
-          "net_id": head.net_id,
           "branch": pred_block,
           "operations": [{
               "kind" : "faucet",
@@ -424,7 +422,6 @@ rpc = {
       npkh = f.contracts[0];
       return node.query('/inject_operation', {
          "signedOperationContents" : opbytes,
-          "force" : false,
       });
     })
     .then(function(f){
@@ -451,7 +448,6 @@ rpc = {
       head = f[0];
       pred_block = head.predecessor;
       var opOb = {
-          "net_id": head.net_id,
           "branch": pred_block,
           "source": keys.pkh,
           "operations": [operation]
@@ -561,7 +557,7 @@ contract = {
     var storage = [];
     var ct = function(){
       eztz.node.query("/blocks/head/proto/context/contracts/"+contract).then(function(r){
-        var ns = eztz.utility.tzjson2arr(r.script.storage.storage);
+        var ns = eztz.utility.tzjson2arr(r.script.storage);
         if (JSON.stringify(storage) != JSON.stringify(ns)){
           storage = ns;
           cb(storage);
@@ -601,7 +597,6 @@ eztz.alphanet.faucet = function(toAddress){
     head = f;
     pred_block = head.predecessor;
     return node.query('/blocks/prevalidation/proto/helpers/forge/operations', {
-        "net_id": head.net_id,
         "branch": pred_block,
         "operations": [{
             "kind" : "faucet",
@@ -623,7 +618,6 @@ eztz.alphanet.faucet = function(toAddress){
     npkh = f.contracts[0];
     return node.query('/inject_operation', {
        "signedOperationContents" : opbytes,
-        "force" : false,
     });
   })
   .then(function(f){
