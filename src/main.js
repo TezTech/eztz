@@ -1,98 +1,4 @@
 //TODO - move functions somewhere else
-var _parseScriptCode = function mm (mi){
-  var bl = 0;
-  var pl = 0;
-  var isString = false;
-  var sopen = false;
-  var escaped = false;
-  var hasB = false;
-  var ins = '';
-  var ret = [];
-  var args = [];
-  var val = "";
-  mi += ";";
-  for(var i = 0; i < mi.length; i++){
-    if (escaped){ // Skip if escapd
-      val += mi[i];
-      escaped = false;
-      continue;
-    }
-    else if (mi[i] == " " && bl == 0 && pl == 0 && sopen == false){
-      if (val){
-        if (ins) {
-          if (isString){
-            val = {"string" : val};
-          } else if (val === parseInt(val).toString()) {
-            val = {"int" : val};
-          }
-          args.push(val);
-        } else {
-          ins = val;
-        }
-        val = '';
-      }
-      continue;
-    }
-    else if (mi[i] == ";" && bl == 0 && pl == 0 && sopen == false){
-      if (val){
-        if (ins || hasB){
-          var vo = {};
-          if (args.length){
-            if (isString){
-              val = {"string" : val};
-            } else if (val === parseInt(val).toString()) {
-              val = {"int" : val};
-            }
-            args.push(val);
-            vo[ins] = [args, {}];
-          } else if (ins){
-            vo[ins] = [[_parseScriptCode(val)], {}];
-          } else {
-            vo = _parseScriptCode(val);
-          }
-          ret.push(vo);
-        } else {
-          ret.push(val);
-        }
-        val = '';
-        ins = '';
-        hasB = false;
-        args = [];
-      }
-      continue;
-    }
-    else if (mi[i] == '"' && sopen) {
-      isString = true;
-      sopen = false;
-      continue;
-    }
-    else if (mi[i] == '"' && !sopen) {
-      sopen = true;
-      continue;
-    }
-    else if (mi[i] == '\\') escaped = true;
-    else if (mi[i] == "(" && !sopen) pl++;
-    else if (mi[i] == ")" && !sopen) pl--;
-    else if (mi[i] == "{" && !sopen) {
-      if (bl === 0){
-        hasB = true;
-        ins = val;
-        val = '';
-        bl++;  
-        continue;
-      }
-      bl++;  
-    }
-    else if (mi[i] == "}" && !sopen) {
-      bl--;
-      if (bl === 0){
-        continue;
-      }
-    }
-    val += mi[i];
-  }
-  return ret;
-}
 function _splitPair(p){
   var ret = [];
   if (typeof p.Pair == "undefined"){
@@ -179,13 +85,16 @@ utility = {
     while(length--) hex += chars[(Math.random() * 16) | 0];
     return hex;
   },
-  ml2tzjson : function me (mi){
+  sexp2mic : function me (mi){
     if (mi.charAt(0) == "(") mi = mi.slice(1,-1);
     var pl = 0;
     var isString = false;
     var sopen = false;
     var escaped = false;
-    var ret = [];
+    var ret = {
+        prim : '',
+        args : []
+    };
     var val = "";
     for(var i = 0; i < mi.length; i++){
       if (escaped){
@@ -197,16 +106,21 @@ utility = {
         if (i == (mi.length - 1)) val += mi[i];
         if (val){
           if (val === parseInt(val).toString()) {
-            val = {"int" : val};
-          } else if (ret.length > 0) val = me(val);
-          ret.push(val);
+            if (!ret.prim) return {"int" : val}
+            else ret.args.push({"int" : val});
+          } else if (ret.prim) {
+              ret.args.push(me(val));
+          } else {
+            ret.prim = val;
+          }
           val = '';
         }
         continue;
       }
       else if (mi[i] == '"' && sopen) {
         sopen = false;  
-        ret.push({'string':val});
+        if (!ret.prim) return {'string':val};
+        else ret.args.push({'string':val});
         val = '';
         continue;
       }
@@ -219,56 +133,49 @@ utility = {
       else if (mi[i] == ")") pl--;
       val += mi[i];
     }
-    if (ret.length > 1){
-      var cc = ret.shift();
-      var oo = {};
-      oo[cc] = [ret, {}]; 
-      return oo;
-    } else {
-      return ret[0];
-    }
-  },
-  tzjson2arr : function(p){return _splitPair(p)},
-  mlraw2json : function(mi){
-    var ret = {}, val = "", type = '', bl = 0, typemap = {
-      "parameter" : "argType",
-      "storage" : "retType",
-      "return" : "storageType",
-    };
-    for(var i = 0; i < mi.length; i++){
-      if (type == '' && mi[i] == " "){
-          val = val.trim();
-          if (val == "parameter" || val == "storage" || val == "return"){
-            type = utility.ml2tzjson(val);
-            val = '';
-            continue;
-          }
-      } else if ((type == "parameter" || type == "storage" || type == "return" ) && mi[i] == ";"){
-        
-        ret[typemap[type]] = val;
-        type = '';
-        val = '';
-        continue;
-      } else if (mi[i] == "{"){
-        if (type == '' && bl == 0 && val.trim() == 'code'){
-            type = 'code';
-            val = '';
-            continue;
-        }
-        bl++;
-      } else if (mi[i] == "}"){
-        if (bl == 0 && type == 'code'){
-          ret[type] = _parseScriptCode(val);
-          type = '';
-          val = '';
-          continue;
-        }
-        bl--;
-      }
-      val += mi[i];
-    }
     return ret;
-  }
+  },
+  mic2arr : function(p){return _splitPair(p)},
+  ml2mic : function me (mi){
+        var ret = [], inseq = false, seq = '', val = '', pl = 0, bl = 0, sopen = false, escaped = false;
+        for(var i = 0; i < mi.length; i++){
+            if (inseq) {
+                if (mi[i] == "}"){
+                    console.log(val);
+                    ret.push({
+                        prim : seq.trim(),
+                        args : [me(val)]
+                    });
+                    val = '';
+                    continue;
+                }
+            } 
+            else if (mi[i] == "{") {
+                seq = val;
+                val = '';
+                inseq = true;
+                continue;
+            }
+            else if (escaped){
+                val += mi[i];
+                escaped = false;
+                continue;
+            } 
+            else if ((i == (mi.length - 1) && sopen == false) || (mi[i] == ";" && pl == 0 && sopen == false)){
+                if (i == (mi.length - 1)) val += mi[i];
+                ret.push(eztz.utility.ml2tzjson(val));
+                val = '';
+                continue;
+            }
+            else if (mi[i] == '"' && sopen) sopen = false;
+            else if (mi[i] == '"' && !sopen) sopen = true;
+            else if (mi[i] == '\\') escaped = true;
+            else if (mi[i] == "(") pl++;  
+            else if (mi[i] == ")") pl--;
+            val += mi[i];
+        }
+        return ret;
+    }
 },
 crypto = {
   generateMnemonic : function(){
@@ -492,11 +399,11 @@ rpc = {
     return rpc.sendOperation(operation, {pk : keys.pk, pkh : from, sk : keys.sk}, fee);
   },
   originate : function(keys, amount, code, init, spendable, delegatable, delegate, fee){
-    var _code = utility.mlraw2json(code), script = {
+    var _code = utility.ml2mic(code), script = {
       code : _code,
       storage : {
         storageType : _code.storageType,
-        storage : utility.ml2tzjson(init)
+        storage : utility.sexp2mic(init)
       }
     }, operation = {
       "kind": "origination",
@@ -517,23 +424,23 @@ rpc = {
     return rpc.sendOperation(operation, {pk : keys.pk, pkh : account, sk : keys.sk}, fee);
   },
   typecheckCode(code){
-    var _code = utility.mlraw2json(code);
+    var _code = utility.ml2mic(code);
     return node.query("/blocks/head/proto/helpers/typecheck_code", _code);
   },
   typecheckData(data, type){
     var check = {
-      data : utility.ml2tzjson(data),
-      type : utility.ml2tzjson(type)
+      data : utility.sexp2mic(data),
+      type : utility.sexp2mic(type)
     };
     return node.query("/blocks/head/proto/helpers/typecheck_data", check);
   },
   runCode(code, amount, input, storage, trace){
     var ep = (trace ? 'trace_code' : 'run_code');
     return node.query("/blocks/head/proto/helpers/" + ep, {
-      script : utility.mlraw2json(code),
+      script : utility.ml2mic(code),
       amount : amount.toFixed(2)*100,
-      input : utility.ml2tzjson(input),
-      storage : utility.ml2tzjson(storage),
+      input : utility.sexp2mic(input),
+      storage : utility.sexp2mic(storage),
     });
   }
 },
@@ -557,7 +464,7 @@ contract = {
     var storage = [];
     var ct = function(){
       eztz.node.query("/blocks/head/proto/context/contracts/"+contract).then(function(r){
-        var ns = eztz.utility.tzjson2arr(r.script.storage);
+        var ns = eztz.utility.mic2arr(r.script.storage);
         if (JSON.stringify(storage) != JSON.stringify(ns)){
           storage = ns;
           cb(storage);
@@ -572,10 +479,15 @@ contract = {
       "kind": "transaction",
       "amount": amount*100,
       "destination": contract,
-      "parameters": eztz.utility.ml2tzjson(parameter)
+      "parameters": eztz.utility.sexp2mic(parameter)
     }, keys, fee);
   }
 };
+
+//Legacy (for new micheline engine)
+utilty.ml2tzjson = utility.sexp2mic;
+utilty.tzjson2arr  = utility.mic2arr;
+utilty.mlraw2json  = utility.ml2mic;
 //Expose library
 eztz = {
   library : library,
