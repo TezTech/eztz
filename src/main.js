@@ -141,7 +141,6 @@ utility = {
         for(var i = 0; i < mi.length; i++){
             if (inseq) {
                 if (mi[i] == "}"){
-                    console.log(val);
                     ret.push({
                         prim : seq.trim(),
                         args : [me(val)]
@@ -485,9 +484,9 @@ contract = {
 };
 
 //Legacy (for new micheline engine)
-utilty.ml2tzjson = utility.sexp2mic;
-utilty.tzjson2arr  = utility.mic2arr;
-utilty.mlraw2json  = utility.ml2mic;
+utility.ml2tzjson = utility.sexp2mic;
+utility.tzjson2arr  = utility.mic2arr;
+utility.mlraw2json  = utility.ml2mic;
 //Expose library
 eztz = {
   library : library,
