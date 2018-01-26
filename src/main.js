@@ -86,7 +86,7 @@ utility = {
     return hex;
   },
   sexp2mic : function me (mi){
-    str = str.replace(/(?:@[a-z_]+)|(?:#.*$)/mg, '')
+    mi = mi.replace(/(?:@[a-z_]+)|(?:#.*$)/mg, '')
           .replace(/\s+/g, ' ')
           .trim();
     if (mi.charAt(0) === "(") mi = mi.slice(1,-1);
