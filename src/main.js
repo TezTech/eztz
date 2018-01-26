@@ -86,9 +86,8 @@ utility = {
     return hex;
   },
   sexp2mic : function me (mi){
-    if (mi.charAt(0) == "(") mi = mi.slice(1,-1);
+    if (mi.charAt(0) === "(") mi = mi.slice(1,-1);
     var pl = 0;
-    var isString = false;
     var sopen = false;
     var escaped = false;
     var ret = {
@@ -102,8 +101,8 @@ utility = {
         escaped = false;
         continue;
       }
-      else if ((i == (mi.length - 1) && sopen == false) || (mi[i] == " " && pl == 0 && sopen == false)){
-        if (i == (mi.length - 1)) val += mi[i];
+      else if ((i === (mi.length - 1) && sopen === false) || (mi[i] === " " && pl === 0 && sopen === false)){
+        if (i === (mi.length - 1)) val += mi[i];
         if (val){
           if (val === parseInt(val).toString()) {
             if (!ret.prim) return {"int" : val}
@@ -117,20 +116,20 @@ utility = {
         }
         continue;
       }
-      else if (mi[i] == '"' && sopen) {
+      else if (mi[i] === '"' && sopen) {
         sopen = false;  
         if (!ret.prim) return {'string':val};
         else ret.args.push({'string':val});
         val = '';
         continue;
       }
-      else if (mi[i] == '"' && !sopen) {
+      else if (mi[i] === '"' && !sopen && pl === 0) {
         sopen = true;
         continue;
       }
-      else if (mi[i] == '\\') escaped = true;
-      else if (mi[i] == "(") pl++;  
-      else if (mi[i] == ")") pl--;
+      else if (mi[i] === '\\') escaped = true;
+      else if (mi[i] === "(") pl++;  
+      else if (mi[i] === ")") pl--;
       val += mi[i];
     }
     return ret;
