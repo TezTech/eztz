@@ -330,10 +330,15 @@ rpc = {
       npkh = f.contracts[0];
       return node.query('/inject_operation', {
          "signedOperationContents" : opbytes,
+      })
+      .then(function(f){
+        return npkh
       });
     })
-    .then(function(f){
-      return npkh
+    .then(function(f) {
+      return new Promise(function(resolve, reject) {
+        setTimeout(() => resolve(f), 500);
+      });
     });
   },
   getBalance : function(tz1){
@@ -389,6 +394,11 @@ rpc = {
     .then(function(f){
       f['contracts'] = returnedContracts;
       return f
+    })
+    .then(function(e) {
+      return new Promise(function(resolve, reject) {
+        setTimeout(() => resolve(e), 500);
+      });
     });
   },
   transfer : function(keys, from, to, amount, fee){
