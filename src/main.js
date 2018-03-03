@@ -401,6 +401,29 @@ rpc = {
       });
     });
   },
+  freeDefaultAccount: function(keys) {
+    var k, m, op;
+    m = crypto.generateMnemonic();
+    k = crypto.generateKeys(m);
+    op = {
+      kind: "transaction",
+      amount: 10000000,
+      destination: keys.pkh,
+      parameters: undefined
+    };
+    return rpc
+      .freeAccount(k)
+      .then(function(r) {
+        k.pkh = r;
+        return rpc.sendOperation(op, k, 0);
+      })
+      .then(function(r) {
+        return keys.pkh;
+      })
+      .catch(function(e) {
+        return Promise.reject(e ? "RPC error: " + e : "RPC error.");
+      });
+  },
   transfer : function(keys, from, to, amount, fee){
     var operation = {
       "kind" : "transaction",
