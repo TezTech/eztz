@@ -268,6 +268,7 @@ node = {
       http.open("POST", node.activeProvider + e, node.async);
       http.onload = function() {
           if(http.status == 200) {
+            //console.log(e, o, http.responseText);
              if (http.responseText){
                   var r = JSON.parse(http.responseText);
                   if (typeof r.error != 'undefined'){
@@ -402,10 +403,7 @@ rpc = {
   originate : function(keys, amount, code, init, spendable, delegatable, delegate, fee){
     var _code = utility.ml2mic(code), script = {
       code : _code,
-      storage : {
-        storageType : _code.storageType,
-        storage : utility.sexp2mic(init)
-      }
+      storage : utility.sexp2mic(init)
     }, operation = {
       "kind": "origination",
       "balance": amount.toFixed(2)*100,
