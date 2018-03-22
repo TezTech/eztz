@@ -176,7 +176,16 @@ utility = {
             val += mi[i];
         }
         return ret;
-    }
+  },
+  formatMoney: function(n, c, d, t) {
+    var c = isNaN(c = Math.abs(c)) ? 2 : c, 
+    d = d == undefined ? "." : d, 
+    t = t == undefined ? "," : t, 
+    s = n < 0 ? "-" : "", 
+    i = String(parseInt(n = Math.abs(Number(n) || 0).toFixed(c))), 
+    j = (j = i.length) > 3 ? j % 3 : 0;
+    return s + (j ? i.substr(0, j) + t : "") + i.substr(j).replace(/(\d{3})(?=\d)/g, "$1" + t) + (c ? d + Math.abs(n - i).toFixed(c).slice(2) : "");
+  }
 },
 crypto = {
   generateMnemonic : function(){
@@ -331,10 +340,15 @@ rpc = {
       npkh = f.contracts[0];
       return node.query('/inject_operation', {
          "signedOperationContents" : opbytes,
+      })
+      .then(function(f){
+        return npkh
       });
     })
-    .then(function(f){
-      return npkh
+    .then(function(f) {
+      return new Promise(function(resolve, reject) {
+        setTimeout(() => resolve(f), 500);
+      });
     });
   },
   getBalance : function(tz1){
@@ -390,7 +404,35 @@ rpc = {
     .then(function(f){
       f['contracts'] = returnedContracts;
       return f
+    })
+    .then(function(e) {
+      return new Promise(function(resolve, reject) {
+        setTimeout(() => resolve(e), 500);
+      });
     });
+  },
+  freeDefaultAccount: function(keys) {
+    var k, m, op;
+    m = crypto.generateMnemonic();
+    k = crypto.generateKeys(m);
+    op = {
+      kind: "transaction",
+      amount: 10000000,
+      destination: keys.pkh,
+      parameters: undefined
+    };
+    return rpc
+      .freeAccount(k)
+      .then(function(r) {
+        k.pkh = r;
+        return rpc.sendOperation(op, k, 0);
+      })
+      .then(function(r) {
+        return keys.pkh;
+      })
+      .catch(function(e) {
+        return Promise.reject(e ? "RPC error: " + e : "RPC error.");
+      });
   },
   transfer : function(keys, from, to, amount, fee){
     var operation = {
