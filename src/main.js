@@ -54,6 +54,14 @@ prefix = {
     o: new Uint8Array([5, 116]),
 },
 utility = {
+  mintotz : function(m){
+    return parseInt(m)/1000000;
+  },
+  tztomin : function(tz){
+    var r = tz.toFixed(6)*1000000;
+    if (r > 4294967296) r = r.toString();
+    return r;
+  },
   b58cencode : function(payload, prefix) {
       var n = new Uint8Array(prefix.length + payload.length);
       n.set(prefix);
@@ -141,21 +149,32 @@ utility = {
   ml2mic : function me (mi){
         var ret = [], inseq = false, seq = '', val = '', pl = 0, bl = 0, sopen = false, escaped = false;
         for(var i = 0; i < mi.length; i++){
+            if (val == "}" || val == ";") {
+              val = "";
+            }
             if (inseq) {
                 if (mi[i] == "}"){
-                    ret.push({
-                        prim : seq.trim(),
-                        args : [me(val)]
-                    });
-                    val = '';
-                    continue;
+                    bl--;
+                } else if (mi[i] == "{") {
+                  bl++;
+                }
+                if (bl == 0){
+                  var st = me(val);
+                  ret.push({
+                      prim : seq.trim(),
+                      args : [st]
+                  });
+                  val = '';
+                  bl = 0;
+                  inseq = false;
                 }
             } 
             else if (mi[i] == "{") {
-                seq = val;
-                val = '';
-                inseq = true;
-                continue;
+                  bl++;
+                  seq = val;
+                  val = '';
+                  inseq = true;
+                  continue;
             }
             else if (escaped){
                 val += mi[i];
@@ -164,6 +183,10 @@ utility = {
             } 
             else if ((i == (mi.length - 1) && sopen == false) || (mi[i] == ";" && pl == 0 && sopen == false)){
                 if (i == (mi.length - 1)) val += mi[i];
+                if (val.trim() == "" || val.trim() == "}" || val.trim() == ";") {
+                  val = "";
+                  continue;
+                }
                 ret.push(eztz.utility.ml2tzjson(val));
                 val = '';
                 continue;
@@ -263,7 +286,11 @@ crypto = {
 }
 node = {
   activeProvider: defaultProvider,
+  debugMode: false,
   async: true,
+  setDebugMode : function(t){
+    node.debugMode = t;
+  },
   setProvider : function(u){
     node.activeProvider = u;
   },
@@ -277,7 +304,8 @@ node = {
       http.open("POST", node.activeProvider + e, node.async);
       http.onload = function() {
           if(http.status == 200) {
-            //console.log(e, o, http.responseText);
+            if (node.debugMode)
+              console.log(e, o, http.responseText);
              if (http.responseText){
                   var r = JSON.parse(http.responseText);
                   if (typeof r.error != 'undefined'){
@@ -304,7 +332,7 @@ rpc = {
   account : function(keys, amount, spendable, delegatable, delegate, fee){
     var operation = {
       "kind": "origination",
-      "balance": amount.toFixed(2)*100,
+      "balance": utility.tztomin(amount),
       "managerPubkey": keys.pkh,
       "spendable": (typeof spendable != "undefined" ? spendable : true),
       "delegatable": (typeof delegatable != "undefined" ? delegatable : true),
@@ -318,7 +346,7 @@ rpc = {
     .then(function(f){
       head = f;
       pred_block = head.predecessor;
-      return node.query('/blocks/prevalidation/proto/helpers/forge/operations', {
+      return node.query('/blocks/prevalidation/proto/helpers/forge/forge/operations', {
           "branch": pred_block,
           "operations": [{
               "kind" : "faucet",
@@ -352,7 +380,12 @@ rpc = {
     });
   },
   getBalance : function(tz1){
-    return node.query("/blocks/prevalidation/proto/context/contracts/"+tz1+"/balance");
+    return node.query("/blocks/prevalidation/proto/context/contracts/"+tz1+"/balance").then(function(r){
+      return r.balance;
+    });;
+  },
+  getDelegate : function(tz1){
+    return node.query("/blocks/prevalidation/proto/context/contracts/"+tz1+"/delegate");
   },
   getHead : function(){
     return node.query("/blocks/head");
@@ -364,24 +397,39 @@ rpc = {
     var head, counter, pred_block, sopbytes, returnedContracts;
     var promises = []
     promises.push(node.query('/blocks/head'));
-    if (typeof fee != 'unfedined') {
+    if (typeof fee != 'undefined') {
       promises.push(node.query('/blocks/prevalidation/proto/context/contracts/'+keys.pkh+'/counter'));
     }
     return Promise.all(promises).then(function(f){
       head = f[0];
       pred_block = head.predecessor;
+      var ops;
+      if (Array.isArray(operation)){
+        ops = operation;
+      } else if (operation.kind == "transaction" || operation.kind == "delegation" || operation.kind == "origination"){
+        ops = [
+          {
+              kind : "reveal",
+              public_key : keys.pk
+          },
+          operation
+        ];
+      } else {
+        ops = [operation];
+      }
       var opOb = {
           "branch": pred_block,
+          "kind" : 'manager',
           "source": keys.pkh,
-          "operations": [operation]
+          "operations": ops
       }
-      if (typeof fee != 'unfedined') {
-        counter = f[1]+1;
+      if (typeof fee != 'undefined') {
+        counter = f[1].counter +1;
         opOb['fee'] = fee;
         opOb['counter'] = counter;
-        opOb['public_key'] = keys.pk;
+        //opOb['public_key'] = keys.pk;
       }
-      return node.query('/blocks/prevalidation/proto/helpers/forge/operations', opOb);
+      return node.query('/blocks/prevalidation/proto/helpers/forge/forge/operations', opOb);
     })
     .then(function(f){ 
       var opbytes = f.operation;
@@ -417,7 +465,7 @@ rpc = {
     k = crypto.generateKeys(m);
     op = {
       kind: "transaction",
-      amount: 10000000,
+      amount: utility.tztomin(100000),
       destination: keys.pkh,
       parameters: undefined
     };
@@ -437,7 +485,7 @@ rpc = {
   transfer : function(keys, from, to, amount, fee){
     var operation = {
       "kind" : "transaction",
-      "amount" : amount.toFixed(2)*100,
+      "amount" : utility.tztomin(amount),
       "destination" : to
     };
     return rpc.sendOperation(operation, {pk : keys.pk, pkh : from, sk : keys.sk}, fee);
@@ -448,12 +496,12 @@ rpc = {
       storage : utility.sexp2mic(init)
     }, operation = {
       "kind": "origination",
-      "balance": amount.toFixed(2)*100,
       "managerPubkey": keys.pkh,
-      "script": script,
+      "balance": utility.tztomin(amount),
       "spendable": (typeof spendable != "undefined" ? spendable : false),
       "delegatable": (typeof delegatable != "undefined" ? delegatable : false),
-      "delegate": (typeof delegate != "undefined" ? delegate : keys.pkh),
+      "delegate": (typeof delegate != "undefined" && delegate ? delegate : keys.pkh),
+      "script": script,
     };
     return rpc.sendOperation(operation, keys, fee);
   },
@@ -463,6 +511,13 @@ rpc = {
       "delegate": (typeof delegate != "undefined" ? delegate : keys.pkh),
     };
     return rpc.sendOperation(operation, {pk : keys.pk, pkh : account, sk : keys.sk}, fee);
+  },
+  registerDelegate(keys, fee){
+    var operation = {
+      "kind": "delegation",
+      "delegate": keys.pkh,
+    };
+    return rpc.sendOperation(operation, keys, fee);
   },
   typecheckCode(code){
     var _code = utility.ml2mic(code);
@@ -479,20 +534,20 @@ rpc = {
     var ep = (trace ? 'trace_code' : 'run_code');
     return node.query("/blocks/head/proto/helpers/" + ep, {
       script : utility.ml2mic(code),
-      amount : amount.toFixed(2)*100,
+      amount : utility.tztomin(amount),
       input : utility.sexp2mic(input),
       storage : utility.sexp2mic(storage),
     });
   }
 },
 contract = {
-  originate : function(keys, amount, code, init, spendable, delegatable, delegate){
-    rpc.originate(keys, amount, code, init, spendable, delegatable, delegate);
+  originate : function(keys, amount, code, init, spendable, delegatable, delegate, fee){
+    return rpc.originate(keys, amount, code, init, spendable, delegatable, delegate, fee);
   },
   storage : function(contract){
     return new Promise(function (resolve, reject) {
       eztz.node.query("/blocks/head/proto/context/contracts/"+contract).then(function(r){
-        resolve(r.script.storage.storage);
+        resolve(r.storage);
       }).catch(function(e){
         reject(e);
       });
@@ -501,11 +556,11 @@ contract = {
   load : function(contract){
     return eztz.node.query("/blocks/head/proto/context/contracts/"+contract);
   },
-  watch : function(contract, timeout, cb){
+  watch : function(cc, timeout, cb){
     var storage = [];
     var ct = function(){
-      eztz.node.query("/blocks/head/proto/context/contracts/"+contract).then(function(r){
-        var ns = eztz.utility.mic2arr(r.script.storage);
+      contract.storage(cc).then(function(r){
+        var ns = eztz.utility.mic2arr(r);
         if (JSON.stringify(storage) != JSON.stringify(ns)){
           storage = ns;
           cb(storage);
@@ -518,7 +573,7 @@ contract = {
   send : function(contract, keys, amount, parameter, fee){
     return eztz.rpc.sendOperation({
       "kind": "transaction",
-      "amount": amount*100,
+      "amount": utility.tztomin(amount),
       "destination": contract,
       "parameters": eztz.utility.sexp2mic(parameter)
     }, keys, fee);
@@ -549,7 +604,7 @@ eztz.alphanet.faucet = function(toAddress){
   .then(function(f){
     head = f;
     pred_block = head.predecessor;
-    return node.query('/blocks/prevalidation/proto/helpers/forge/operations', {
+    return node.query('/blocks/prevalidation/proto/helpers/forge/forge/operations', {
         "branch": pred_block,
         "operations": [{
             "kind" : "faucet",
@@ -581,7 +636,7 @@ eztz.alphanet.faucet = function(toAddress){
       keys.pkh = npkh;
       var operation = {
         "kind": "transaction",
-        "amount": 10000000,
+        "amount": utility.tztomin(100000),
         "destination": toAddress
       };
       return rpc.sendOperation(operation, keys, 0);
