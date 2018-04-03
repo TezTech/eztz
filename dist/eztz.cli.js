@@ -1,99 +1,5 @@
+//TEMP FIX
 if (typeof XMLHttpRequest == "undefined") XMLHttpRequest = require("xmlhttprequest").XMLHttpRequest;
-//TODO - move functions somewhere else
-var _parseScriptCode = function mm (mi){
-  var bl = 0;
-  var pl = 0;
-  var isString = false;
-  var sopen = false;
-  var escaped = false;
-  var hasB = false;
-  var ins = '';
-  var ret = [];
-  var args = [];
-  var val = "";
-  mi += ";";
-  for(var i = 0; i < mi.length; i++){
-    if (escaped){ // Skip if escapd
-      val += mi[i];
-      escaped = false;
-      continue;
-    }
-    else if (mi[i] == " " && bl == 0 && pl == 0 && sopen == false){
-      if (val){
-        if (ins) {
-          if (isString){
-            val = {"string" : val};
-          } else if (val === parseInt(val).toString()) {
-            val = {"int" : val};
-          }
-          args.push(val);
-        } else {
-          ins = val;
-        }
-        val = '';
-      }
-      continue;
-    }
-    else if (mi[i] == ";" && bl == 0 && pl == 0 && sopen == false){
-      if (val){
-        if (ins || hasB){
-          var vo = {};
-          if (args.length){
-            if (isString){
-              val = {"string" : val};
-            } else if (val === parseInt(val).toString()) {
-              val = {"int" : val};
-            }
-            args.push(val);
-            vo[ins] = [args, {}];
-          } else if (ins){
-            vo[ins] = [[_parseScriptCode(val)], {}];
-          } else {
-            vo = _parseScriptCode(val);
-          }
-          ret.push(vo);
-        } else {
-          ret.push(val);
-        }
-        val = '';
-        ins = '';
-        hasB = false;
-        args = [];
-      }
-      continue;
-    }
-    else if (mi[i] == '"' && sopen) {
-      isString = true;
-      sopen = false;
-      continue;
-    }
-    else if (mi[i] == '"' && !sopen) {
-      sopen = true;
-      continue;
-    }
-    else if (mi[i] == '\\') escaped = true;
-    else if (mi[i] == "(" && !sopen) pl++;
-    else if (mi[i] == ")" && !sopen) pl--;
-    else if (mi[i] == "{" && !sopen) {
-      if (bl === 0){
-        hasB = true;
-        ins = val;
-        val = '';
-        bl++;  
-        continue;
-      }
-      bl++;  
-    }
-    else if (mi[i] == "}" && !sopen) {
-      bl--;
-      if (bl === 0){
-        continue;
-      }
-    }
-    val += mi[i];
-  }
-  return ret;
-}
 function _splitPair(p){
   var ret = [];
   if (typeof p.Pair == "undefined"){
@@ -133,8 +39,7 @@ function _process(p){
     return p;
   }
 }
-const Buffer = require('buffer/').Buffer,
-defaultProvider = "https://tezrpc.me/api",
+const defaultProvider = "https://tezrpc.me/zeronet",
 library = {
   bs58check : require('bs58check'),
   sodium : require('libsodium-wrappers'),
@@ -149,6 +54,14 @@ prefix = {
     o: new Uint8Array([5, 116]),
 },
 utility = {
+  mintotz : function(m){
+    return parseInt(m)/1000000;
+  },
+  tztomin : function(tz){
+    var r = tz.toFixed(6)*1000000;
+    if (r > 4294967296) r = r.toString();
+    return r;
+  },
   b58cencode : function(payload, prefix) {
       var n = new Uint8Array(prefix.length + payload.length);
       n.set(prefix);
@@ -180,13 +93,18 @@ utility = {
     while(length--) hex += chars[(Math.random() * 16) | 0];
     return hex;
   },
-  ml2tzjson : function me (mi){
-    if (mi.charAt(0) == "(") mi = mi.slice(1,-1);
+  sexp2mic : function me (mi){
+    mi = mi.replace(/(?:@[a-z_]+)|(?:#.*$)/mg, '')
+          .replace(/\s+/g, ' ')
+          .trim();
+    if (mi.charAt(0) === "(") mi = mi.slice(1,-1);
     var pl = 0;
-    var isString = false;
     var sopen = false;
     var escaped = false;
-    var ret = [];
+    var ret = {
+        prim : '',
+        args : []
+    };
     var val = "";
     for(var i = 0; i < mi.length; i++){
       if (escaped){
@@ -194,81 +112,102 @@ utility = {
         escaped = false;
         continue;
       }
-      else if ((i == (mi.length - 1) && sopen == false) || (mi[i] == " " && pl == 0 && sopen == false)){
-        if (i == (mi.length - 1)) val += mi[i];
+      else if ((i === (mi.length - 1) && sopen === false) || (mi[i] === " " && pl === 0 && sopen === false)){
+        if (i === (mi.length - 1)) val += mi[i];
         if (val){
           if (val === parseInt(val).toString()) {
-            val = {"int" : val};
-          } else if (ret.length > 0) val = me(val);
-          ret.push(val);
+            if (!ret.prim) return {"int" : val}
+            else ret.args.push({"int" : val});
+          } else if (ret.prim) {
+              ret.args.push(me(val));
+          } else {
+            ret.prim = val;
+          }
           val = '';
         }
         continue;
       }
-      else if (mi[i] == '"' && sopen) {
+      else if (mi[i] === '"' && sopen) {
         sopen = false;  
-        ret.push({'string':val});
+        if (!ret.prim) return {'string':val};
+        else ret.args.push({'string':val});
         val = '';
         continue;
       }
-      else if (mi[i] == '"' && !sopen) {
+      else if (mi[i] === '"' && !sopen && pl === 0) {
         sopen = true;
         continue;
       }
-      else if (mi[i] == '\\') escaped = true;
-      else if (mi[i] == "(") pl++;  
-      else if (mi[i] == ")") pl--;
-      val += mi[i];
-    }
-    if (ret.length > 1){
-      var cc = ret.shift();
-      var oo = {};
-      oo[cc] = [ret, {}]; 
-      return oo;
-    } else {
-      return ret[0];
-    }
-  },
-  tzjson2arr : function(p){return _splitPair(p)},
-  mlraw2json : function(mi){
-    var ret = {}, val = "", type = '', bl = 0, typemap = {
-      "parameter" : "argType",
-      "storage" : "retType",
-      "return" : "storageType",
-    };
-    for(var i = 0; i < mi.length; i++){
-      if (type == '' && mi[i] == " "){
-          val = val.trim();
-          if (val == "parameter" || val == "storage" || val == "return"){
-            type = utility.ml2tzjson(val);
-            val = '';
-            continue;
-          }
-      } else if ((type == "parameter" || type == "storage" || type == "return" ) && mi[i] == ";"){
-        
-        ret[typemap[type]] = val;
-        type = '';
-        val = '';
-        continue;
-      } else if (mi[i] == "{"){
-        if (type == '' && bl == 0 && val.trim() == 'code'){
-            type = 'code';
-            val = '';
-            continue;
-        }
-        bl++;
-      } else if (mi[i] == "}"){
-        if (bl == 0 && type == 'code'){
-          ret[type] = _parseScriptCode(val);
-          type = '';
-          val = '';
-          continue;
-        }
-        bl--;
-      }
+      else if (mi[i] === '\\') escaped = true;
+      else if (mi[i] === "(") pl++;  
+      else if (mi[i] === ")") pl--;
       val += mi[i];
     }
     return ret;
+  },
+  mic2arr : function(p){return _splitPair(p)},
+  ml2mic : function me (mi){
+        var ret = [], inseq = false, seq = '', val = '', pl = 0, bl = 0, sopen = false, escaped = false;
+        for(var i = 0; i < mi.length; i++){
+            if (val == "}" || val == ";") {
+              val = "";
+            }
+            if (inseq) {
+                if (mi[i] == "}"){
+                    bl--;
+                } else if (mi[i] == "{") {
+                  bl++;
+                }
+                if (bl == 0){
+                  var st = me(val);
+                  ret.push({
+                      prim : seq.trim(),
+                      args : [st]
+                  });
+                  val = '';
+                  bl = 0;
+                  inseq = false;
+                }
+            } 
+            else if (mi[i] == "{") {
+                  bl++;
+                  seq = val;
+                  val = '';
+                  inseq = true;
+                  continue;
+            }
+            else if (escaped){
+                val += mi[i];
+                escaped = false;
+                continue;
+            } 
+            else if ((i == (mi.length - 1) && sopen == false) || (mi[i] == ";" && pl == 0 && sopen == false)){
+                if (i == (mi.length - 1)) val += mi[i];
+                if (val.trim() == "" || val.trim() == "}" || val.trim() == ";") {
+                  val = "";
+                  continue;
+                }
+                ret.push(eztz.utility.ml2tzjson(val));
+                val = '';
+                continue;
+            }
+            else if (mi[i] == '"' && sopen) sopen = false;
+            else if (mi[i] == '"' && !sopen) sopen = true;
+            else if (mi[i] == '\\') escaped = true;
+            else if (mi[i] == "(") pl++;  
+            else if (mi[i] == ")") pl--;
+            val += mi[i];
+        }
+        return ret;
+  },
+  formatMoney: function(n, c, d, t) {
+    var c = isNaN(c = Math.abs(c)) ? 2 : c, 
+    d = d == undefined ? "." : d, 
+    t = t == undefined ? "," : t, 
+    s = n < 0 ? "-" : "", 
+    i = String(parseInt(n = Math.abs(Number(n) || 0).toFixed(c))), 
+    j = (j = i.length) > 3 ? j % 3 : 0;
+    return s + (j ? i.substr(0, j) + t : "") + i.substr(j).replace(/(\d{3})(?=\d)/g, "$1" + t) + (c ? d + Math.abs(n - i).toFixed(c).slice(2) : "");
   }
 },
 crypto = {
@@ -347,7 +286,11 @@ crypto = {
 }
 node = {
   activeProvider: defaultProvider,
+  debugMode: false,
   async: true,
+  setDebugMode : function(t){
+    node.debugMode = t;
+  },
   setProvider : function(u){
     node.activeProvider = u;
   },
@@ -361,6 +304,8 @@ node = {
       http.open("POST", node.activeProvider + e, node.async);
       http.onload = function() {
           if(http.status == 200) {
+            if (node.debugMode)
+              console.log(e, o, http.responseText);
              if (http.responseText){
                   var r = JSON.parse(http.responseText);
                   if (typeof r.error != 'undefined'){
@@ -387,7 +332,7 @@ rpc = {
   account : function(keys, amount, spendable, delegatable, delegate, fee){
     var operation = {
       "kind": "origination",
-      "balance": amount.toFixed(2)*100,
+      "balance": utility.tztomin(amount),
       "managerPubkey": keys.pkh,
       "spendable": (typeof spendable != "undefined" ? spendable : true),
       "delegatable": (typeof delegatable != "undefined" ? delegatable : true),
@@ -401,8 +346,7 @@ rpc = {
     .then(function(f){
       head = f;
       pred_block = head.predecessor;
-      return node.query('/blocks/prevalidation/proto/helpers/forge/operations', {
-          "net_id": head.net_id,
+      return node.query('/blocks/prevalidation/proto/helpers/forge/forge/operations', {
           "branch": pred_block,
           "operations": [{
               "kind" : "faucet",
@@ -424,15 +368,24 @@ rpc = {
       npkh = f.contracts[0];
       return node.query('/inject_operation', {
          "signedOperationContents" : opbytes,
-          "force" : false,
+      })
+      .then(function(f){
+        return npkh
       });
     })
-    .then(function(f){
-      return npkh
+    .then(function(f) {
+      return new Promise(function(resolve, reject) {
+        setTimeout(() => resolve(f), 500);
+      });
     });
   },
   getBalance : function(tz1){
-    return node.query("/blocks/prevalidation/proto/context/contracts/"+tz1+"/balance");
+    return node.query("/blocks/prevalidation/proto/context/contracts/"+tz1+"/balance").then(function(r){
+      return r.balance;
+    });;
+  },
+  getDelegate : function(tz1){
+    return node.query("/blocks/prevalidation/proto/context/contracts/"+tz1+"/delegate");
   },
   getHead : function(){
     return node.query("/blocks/head");
@@ -444,25 +397,39 @@ rpc = {
     var head, counter, pred_block, sopbytes, returnedContracts;
     var promises = []
     promises.push(node.query('/blocks/head'));
-    if (typeof fee != 'unfedined') {
+    if (typeof fee != 'undefined') {
       promises.push(node.query('/blocks/prevalidation/proto/context/contracts/'+keys.pkh+'/counter'));
     }
     return Promise.all(promises).then(function(f){
       head = f[0];
       pred_block = head.predecessor;
-      var opOb = {
-          "net_id": head.net_id,
-          "branch": pred_block,
-          "source": keys.pkh,
-          "operations": [operation]
+      var ops;
+      if (Array.isArray(operation)){
+        ops = operation;
+      } else if (operation.kind == "transaction" || operation.kind == "delegation" || operation.kind == "origination"){
+        ops = [
+          {
+              kind : "reveal",
+              public_key : keys.pk
+          },
+          operation
+        ];
+      } else {
+        ops = [operation];
       }
-      if (typeof fee != 'unfedined') {
-        counter = f[1]+1;
+      var opOb = {
+          "branch": pred_block,
+          "kind" : 'manager',
+          "source": keys.pkh,
+          "operations": ops
+      }
+      if (typeof fee != 'undefined') {
+        counter = f[1].counter +1;
         opOb['fee'] = fee;
         opOb['counter'] = counter;
-        opOb['public_key'] = keys.pk;
+        //opOb['public_key'] = keys.pk;
       }
-      return node.query('/blocks/prevalidation/proto/helpers/forge/operations', opOb);
+      return node.query('/blocks/prevalidation/proto/helpers/forge/forge/operations', opOb);
     })
     .then(function(f){ 
       var opbytes = f.operation;
@@ -485,31 +452,56 @@ rpc = {
     .then(function(f){
       f['contracts'] = returnedContracts;
       return f
+    })
+    .then(function(e) {
+      return new Promise(function(resolve, reject) {
+        setTimeout(() => resolve(e), 500);
+      });
     });
+  },
+  freeDefaultAccount: function(keys) {
+    var k, m, op;
+    m = crypto.generateMnemonic();
+    k = crypto.generateKeys(m);
+    op = {
+      kind: "transaction",
+      amount: utility.tztomin(100000),
+      destination: keys.pkh,
+      parameters: undefined
+    };
+    return rpc
+      .freeAccount(k)
+      .then(function(r) {
+        k.pkh = r;
+        return rpc.sendOperation(op, k, 0);
+      })
+      .then(function(r) {
+        return keys.pkh;
+      })
+      .catch(function(e) {
+        return Promise.reject(e ? "RPC error: " + e : "RPC error.");
+      });
   },
   transfer : function(keys, from, to, amount, fee){
     var operation = {
       "kind" : "transaction",
-      "amount" : amount.toFixed(2)*100,
+      "amount" : utility.tztomin(amount),
       "destination" : to
     };
     return rpc.sendOperation(operation, {pk : keys.pk, pkh : from, sk : keys.sk}, fee);
   },
   originate : function(keys, amount, code, init, spendable, delegatable, delegate, fee){
-    var _code = utility.mlraw2json(code), script = {
+    var _code = utility.ml2mic(code), script = {
       code : _code,
-      storage : {
-        storageType : _code.storageType,
-        storage : utility.ml2tzjson(init)
-      }
+      storage : utility.sexp2mic(init)
     }, operation = {
       "kind": "origination",
-      "balance": amount.toFixed(2)*100,
       "managerPubkey": keys.pkh,
-      "script": script,
+      "balance": utility.tztomin(amount),
       "spendable": (typeof spendable != "undefined" ? spendable : false),
       "delegatable": (typeof delegatable != "undefined" ? delegatable : false),
-      "delegate": (typeof delegate != "undefined" ? delegate : keys.pkh),
+      "delegate": (typeof delegate != "undefined" && delegate ? delegate : keys.pkh),
+      "script": script,
     };
     return rpc.sendOperation(operation, keys, fee);
   },
@@ -520,35 +512,42 @@ rpc = {
     };
     return rpc.sendOperation(operation, {pk : keys.pk, pkh : account, sk : keys.sk}, fee);
   },
+  registerDelegate(keys, fee){
+    var operation = {
+      "kind": "delegation",
+      "delegate": keys.pkh,
+    };
+    return rpc.sendOperation(operation, keys, fee);
+  },
   typecheckCode(code){
-    var _code = utility.mlraw2json(code);
+    var _code = utility.ml2mic(code);
     return node.query("/blocks/head/proto/helpers/typecheck_code", _code);
   },
   typecheckData(data, type){
     var check = {
-      data : utility.ml2tzjson(data),
-      type : utility.ml2tzjson(type)
+      data : utility.sexp2mic(data),
+      type : utility.sexp2mic(type)
     };
     return node.query("/blocks/head/proto/helpers/typecheck_data", check);
   },
   runCode(code, amount, input, storage, trace){
     var ep = (trace ? 'trace_code' : 'run_code');
     return node.query("/blocks/head/proto/helpers/" + ep, {
-      script : utility.mlraw2json(code),
-      amount : amount.toFixed(2)*100,
-      input : utility.ml2tzjson(input),
-      storage : utility.ml2tzjson(storage),
+      script : utility.ml2mic(code),
+      amount : utility.tztomin(amount),
+      input : utility.sexp2mic(input),
+      storage : utility.sexp2mic(storage),
     });
   }
 },
 contract = {
-  originate : function(keys, amount, code, init, spendable, delegatable, delegate){
-    rpc.originate(keys, amount, code, init, spendable, delegatable, delegate);
+  originate : function(keys, amount, code, init, spendable, delegatable, delegate, fee){
+    return rpc.originate(keys, amount, code, init, spendable, delegatable, delegate, fee);
   },
   storage : function(contract){
     return new Promise(function (resolve, reject) {
       eztz.node.query("/blocks/head/proto/context/contracts/"+contract).then(function(r){
-        resolve(r.script.storage.storage);
+        resolve(r.storage);
       }).catch(function(e){
         reject(e);
       });
@@ -557,11 +556,11 @@ contract = {
   load : function(contract){
     return eztz.node.query("/blocks/head/proto/context/contracts/"+contract);
   },
-  watch : function(contract, timeout, cb){
+  watch : function(cc, timeout, cb){
     var storage = [];
     var ct = function(){
-      eztz.node.query("/blocks/head/proto/context/contracts/"+contract).then(function(r){
-        var ns = eztz.utility.tzjson2arr(r.script.storage.storage);
+      contract.storage(cc).then(function(r){
+        var ns = eztz.utility.mic2arr(r);
         if (JSON.stringify(storage) != JSON.stringify(ns)){
           storage = ns;
           cb(storage);
@@ -574,12 +573,17 @@ contract = {
   send : function(contract, keys, amount, parameter, fee){
     return eztz.rpc.sendOperation({
       "kind": "transaction",
-      "amount": amount*100,
+      "amount": utility.tztomin(amount),
       "destination": contract,
-      "parameters": eztz.utility.ml2tzjson(parameter)
+      "parameters": eztz.utility.sexp2mic(parameter)
     }, keys, fee);
   }
 };
+
+//Legacy (for new micheline engine)
+utility.ml2tzjson = utility.sexp2mic;
+utility.tzjson2arr  = utility.mic2arr;
+utility.mlraw2json  = utility.ml2mic;
 //Expose library
 eztz = {
   library : library,
@@ -600,8 +604,7 @@ eztz.alphanet.faucet = function(toAddress){
   .then(function(f){
     head = f;
     pred_block = head.predecessor;
-    return node.query('/blocks/prevalidation/proto/helpers/forge/operations', {
-        "net_id": head.net_id,
+    return node.query('/blocks/prevalidation/proto/helpers/forge/forge/operations', {
         "branch": pred_block,
         "operations": [{
             "kind" : "faucet",
@@ -623,7 +626,6 @@ eztz.alphanet.faucet = function(toAddress){
     npkh = f.contracts[0];
     return node.query('/inject_operation', {
        "signedOperationContents" : opbytes,
-        "force" : false,
     });
   })
   .then(function(f){
@@ -634,7 +636,7 @@ eztz.alphanet.faucet = function(toAddress){
       keys.pkh = npkh;
       var operation = {
         "kind": "transaction",
-        "amount": 10000000,
+        "amount": utility.tztomin(100000),
         "destination": toAddress
       };
       return rpc.sendOperation(operation, keys, 0);

@@ -5,26 +5,19 @@
   <body>
     <script src="../dist/eztz.min.js"></script>
     <script>
+      eztz.node.setDebugMode(true);
+      eztz.node.setProvider("https://tezrpc.me/zeronet");
+    
       //Generate mnemonic
-      var m = eztz.crypto.generateMnemonic();
-			console.log(m);
+      //var m = eztz.crypto.generateMnemonic();
+      var m = "express rare deer foam soccer limit reflect luggage assault false major evil bunker rice pact";
 			
 			//Generate keys
-      var keys = eztz.crypto.generateKeys(m, "test");
+      var keys = eztz.crypto.generateKeys(m, "tester");
+      
       console.log(keys);
+      eztz.contract.originate(keys, 10, 'parameter (pair string nat);storage (set (pair string nat));return unit;code{DUP;CDR;SWAP;CAR;CONS;UNIT;PAIR};', '{}', true, false, null, 0).then(function(r){console.log(r)})
       
-      
-      //Get free tez from faucet
-      eztz.alphanet.faucet(keys.pkh)
-      .then(function(r){
-        //Show balance
-        return eztz.rpc.getBalance(keys.pkh);
-      })
-      .then(function(r){
-        console.log(r);
-      }).catch(function(e){
-        console.log("Error", e);
-      });
     </script>
   </body>
 </html>

@@ -1,8 +1,8 @@
 {
   "dependencies": {
-    "bip39": "^2.4.0",
-    "bs58check": "^2.0.2",
-    "buffer": "^5.0.7",
+    "bip39": "^2.5.0",
+    "bs58check": "^2.1.1",
+    "buffer": "^5.1.0",
     "codecov": "^2.3.1",
     "libsodium-wrappers": "^0.5.4",
     "pbkdf2": "^3.0.14",
@@ -16,7 +16,7 @@
   "devDependencies": {
     "browserify": "^14.4.0",
     "jest": "^21.2.1",
-    "uglifyjs-webpack-plugin": "^1.0.0-rc.0",
-    "webpack": "^3.8.1"
+    "uglifyjs-webpack-plugin": "^1.2.4",
+    "webpack": "^3.11.0"
   }
 }
