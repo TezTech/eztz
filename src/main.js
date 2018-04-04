@@ -105,7 +105,7 @@ utility = {
     }
     return ret;
   },
-  mic2arr : function me2 (p){
+  mic2arr : function me2 (s){
     var ret = [];
     if (s.hasOwnProperty("prim")) {
         if (s.prim == "Pair"){
@@ -549,7 +549,7 @@ contract = {
   },
   storage : function(contract){
     return new Promise(function (resolve, reject) {
-      eztz.node.query("/blocks/head/proto/context/contracts/"+contract).then(function(r){
+      eztz.node.query("/blocks/prevalidation/proto/context/contracts/"+contract).then(function(r){
         resolve(r.storage);
       }).catch(function(e){
         reject(e);
@@ -563,9 +563,8 @@ contract = {
     var storage = [];
     var ct = function(){
       contract.storage(cc).then(function(r){
-        var ns = eztz.utility.mic2arr(r);
-        if (JSON.stringify(storage) != JSON.stringify(ns)){
-          storage = ns;
+        if (JSON.stringify(storage) != JSON.stringify(r)){
+          storage = r;
           cb(storage);
         }
       });
