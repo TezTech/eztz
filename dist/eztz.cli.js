@@ -1,44 +1,5 @@
 //TEMP FIX
 if (typeof XMLHttpRequest == "undefined") XMLHttpRequest = require("xmlhttprequest").XMLHttpRequest;
-function _splitPair(p){
-  var ret = [];
-  if (typeof p.Pair == "undefined"){
-    ret.push(_process(p));
-  } else {
-    ret.push(_process(p.Pair[0][0]));
-    var ss = _splitPair(p.Pair[0][1]);
-    ret = ret.concat(ss);
-  }
-  return ret;
-}
-function _process(p){
-  if (typeof p.Pair != "undefined"){
-    return _splitPair(p);
-  } else if (typeof p.Map != "undefined"){
-    var map = [];
-    var tl = p.Map[0];
-    for(var i = 0; i < tl.length; i++){
-      map.push({
-        key : _process(p.Map[0][i].Item[0][0]),
-        value : _process(p.Map[0][i].Item[0][1])
-      });
-    }
-    return map;
-  } else if (typeof p.List != "undefined"){
-    var list = [];
-    var tl = p.List[0];
-    for(var i = 0; i < tl.length; i++){
-      list.push(_process(p.List[0][i]));
-    }
-    return list;
-  } else if (typeof p.string != "undefined"){
-    return p.string;
-  } else if (typeof p.int != "undefined"){
-    return p.int;
-  } else {
-    return p;
-  }
-}
 const defaultProvider = "https://tezrpc.me/zeronet",
 library = {
   bs58check : require('bs58check'),
@@ -145,7 +106,50 @@ utility = {
     }
     return ret;
   },
-  mic2arr : function(p){return _splitPair(p)},
+  mic2arr : function me2 (s){
+    var ret = [];
+    if (s.hasOwnProperty("prim")) {
+        if (s.prim == "Pair"){
+            ret.push(me2(s.args[0]));
+            ret = ret.concat(me2(s.args[1]));
+        } else if (s.prim == "Elt"){
+            ret = {
+                key : me2(s.args[0]),
+                val : me2(s.args[1])
+            };
+        } else if (s.prim == "True"){
+            ret = true
+        } else if (s.prim == "False"){
+            ret = false;
+        }
+    } else {
+        if (Array.isArray(s)){
+            var sc = s.length;
+            for(var i = 0; i < sc; i++){
+              var n = me2(s[i]);
+              if (typeof n.key != 'undefined'){
+                if (Array.isArray(ret)){
+                  ret = {
+                    keys : [],
+                    vals : [],
+                  };
+                }
+                ret.keys.push(n.key);
+                ret.vals.push(n.val);
+              } else {
+                ret.push(n);
+              }
+            }
+        } else if (s.hasOwnProperty("string")) {
+            ret = s.string;
+        } else if (s.hasOwnProperty("int")) {
+            ret = parseInt(s.int);
+        } else {
+            ret = s;
+        }
+    }
+    return ret;
+  },
   ml2mic : function me (mi){
         var ret = [], inseq = false, seq = '', val = '', pl = 0, bl = 0, sopen = false, escaped = false;
         for(var i = 0; i < mi.length; i++){
@@ -546,7 +550,7 @@ contract = {
   },
   storage : function(contract){
     return new Promise(function (resolve, reject) {
-      eztz.node.query("/blocks/head/proto/context/contracts/"+contract).then(function(r){
+      eztz.node.query("/blocks/prevalidation/proto/context/contracts/"+contract).then(function(r){
         resolve(r.storage);
       }).catch(function(e){
         reject(e);
@@ -560,9 +564,8 @@ contract = {
     var storage = [];
     var ct = function(){
       contract.storage(cc).then(function(r){
-        var ns = eztz.utility.mic2arr(r);
-        if (JSON.stringify(storage) != JSON.stringify(ns)){
-          storage = ns;
+        if (JSON.stringify(storage) != JSON.stringify(r)){
+          storage = r;
           cb(storage);
         }
       });
@@ -632,7 +635,6 @@ eztz.alphanet.faucet = function(toAddress){
     return node.query('/blocks/prevalidation/proto/context/contracts/'+npkh+'/manager');
   })
   .then(function(f){
-      //Transfer from free account
       keys.pkh = npkh;
       var operation = {
         "kind": "transaction",
