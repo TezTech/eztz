@@ -337,7 +337,7 @@ node = {
         .then(function (f) {
           head = f;
           pred_block = head.predecessor;
-          return node.query('/blocks/prevalidation/proto/helpers/forge/forge/operations', {
+          return node.query('/blocks/head/proto/helpers/forge/operations', {
             "branch": pred_block,
             "operations": [{
               "kind": "faucet",
@@ -349,7 +349,7 @@ node = {
         .then(function (f) {
           opbytes = f.operation;
           var operationHash = utility.b58cencode(library.sodium.crypto_generichash(32, utility.hex2buf(opbytes)), prefix.o);
-          return node.query('/blocks/prevalidation/proto/helpers/apply_operation', {
+          return node.query('/blocks/head/proto/helpers/apply_operation', {
             "pred_block": pred_block,
             "operation_hash": operationHash,
             "forged_operation": opbytes,
@@ -371,12 +371,12 @@ node = {
         });
     },
     getBalance: function (tz1) {
-      return node.query("/blocks/prevalidation/proto/context/contracts/" + tz1 + "/balance").then(function (r) {
+      return node.query("/blocks/head/proto/context/contracts/" + tz1 + "/balance").then(function (r) {
         return r.balance;
       });
     },
     getDelegate: function (tz1) {
-      return node.query("/blocks/prevalidation/proto/context/contracts/" + tz1 + "/delegate");
+      return node.query("/blocks/head/proto/context/contracts/" + tz1 + "/delegate");
     },
     getHead: function () {
       return node.query("/blocks/head");
@@ -389,7 +389,7 @@ node = {
       var promises = []
       promises.push(node.query('/blocks/head'));
       if (typeof fee !== 'undefined') {
-        promises.push(node.query('/blocks/prevalidation/proto/context/contracts/' + keys.pkh + '/counter'));
+        promises.push(node.query('/blocks/head/proto/context/contracts/' + keys.pkh + '/counter'));
       }
       return Promise.all(promises).then(function (f) {
         head = f[0];
@@ -420,14 +420,14 @@ node = {
           opOb['counter'] = counter;
           //opOb['public_key'] = keys.pk;
         }
-        return node.query('/blocks/prevalidation/proto/helpers/forge/forge/operations', opOb);
+        return node.query('/blocks/head/proto/helpers/forge/operations', opOb);
       })
         .then(function (f) {
           var opbytes = f.operation;
           var signed = crypto.sign(opbytes, keys.sk);
           sopbytes = signed.sbytes;
           var oh = utility.b58cencode(library.sodium.crypto_generichash(32, utility.hex2buf(sopbytes)), prefix.o);
-          return node.query('/blocks/prevalidation/proto/helpers/apply_operation', {
+          return node.query('/blocks/head/proto/helpers/apply_operation', {
             "pred_block": pred_block,
             "operation_hash": oh,
             "forged_operation": opbytes,
@@ -537,7 +537,7 @@ node = {
     },
     storage: function (contract) {
       return new Promise(function (resolve, reject) {
-        eztz.node.query("/blocks/prevalidation/proto/context/contracts/" + contract).then(function (r) {
+        eztz.node.query("/blocks/head/proto/context/contracts/" + contract).then(function (r) {
           resolve(r.storage);
         }).catch(function (e) {
           reject(e);
@@ -594,7 +594,7 @@ eztz.alphanet.faucet = function (toAddress) {
     .then(function (f) {
       head = f;
       pred_block = head.predecessor;
-      return node.query('/blocks/prevalidation/proto/helpers/forge/forge/operations', {
+      return node.query('/blocks/head/proto/helpers/forge/operations', {
         "branch": pred_block,
         "operations": [{
           "kind": "faucet",
@@ -606,7 +606,7 @@ eztz.alphanet.faucet = function (toAddress) {
     .then(function (f) {
       opbytes = f.operation;
       const operationHash = utility.b58cencode(library.sodium.crypto_generichash(32, utility.hex2buf(opbytes)), prefix.o);
-      return node.query('/blocks/prevalidation/proto/helpers/apply_operation', {
+      return node.query('/blocks/head/proto/helpers/apply_operation', {
         "pred_block": pred_block,
         "operation_hash": operationHash,
         "forged_operation": opbytes,
@@ -618,7 +618,7 @@ eztz.alphanet.faucet = function (toAddress) {
         "signedOperationContents": opbytes,
       });
     })
-    .then(() => node.query('/blocks/prevalidation/proto/context/contracts/' + npkh + '/manager'))
+    .then(() => node.query('/blocks/head/proto/context/contracts/' + npkh + '/manager'))
     .then(function () {
       keys.pkh = npkh;
       const operation = {
