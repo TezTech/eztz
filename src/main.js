@@ -315,6 +315,7 @@ node = {
       http.onerror = function () {
         reject(http.statusText);
       };
+      http.setRequestHeader("Content-Type", "application/json");
       http.send(JSON.stringify(o));
     });
   }
