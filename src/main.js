@@ -261,7 +261,7 @@ const Buffer = require('buffer/').Buffer,
       };
     },
     sign: function (bytes, sk) {
-      const sig = library.sodium.crypto_sign_detached(utility.hex2buf(bytes), utility.b58cdecode(sk, prefix.edsk), 'uint8array');
+      const sig = library.sodium.crypto_sign_detached(library.sodium.crypto_generichash(32, utility.hex2buf(bytes)), utility.b58cdecode(sk, prefix.edsk), 'uint8array');
       const edsig = utility.b58cencode(sig, prefix.edsig);
       const sbytes = bytes + utility.buf2hex(sig);
       return {
