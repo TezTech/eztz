@@ -1,5 +1,5 @@
 const Buffer = require('buffer/').Buffer,
-  defaultProvider = "https://tezrpc.me/zeronet",
+  defaultProvider = "https://rpc.smartcontractlabs.ee",
   library = {
     bs58check: require('bs58check'),
     sodium: require('libsodium-wrappers'),
