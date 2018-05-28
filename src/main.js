@@ -11,7 +11,10 @@ prefix = {
     edpk: new Uint8Array([13, 15, 37, 217]),
     edsk: new Uint8Array([43, 246, 78, 7]),
     edsig: new Uint8Array([9, 245, 205, 134, 18]),
+    nce: new Uint8Array([69, 220, 169]),
+    b: new Uint8Array([1,52]),
     o: new Uint8Array([5, 116]),
+    TZ: new Uint8Array([3,99,29]),
 },
 utility = {
   mintotz : function(m){
@@ -214,6 +217,13 @@ utility = {
   }
 },
 crypto = {
+  extractKeys : function(sk){
+    return {
+      pk : utility.b58cencode(utility.b58cdecode(sk, prefix.edsk).slice(32), prefix.edpk),
+      pkh : utility.b58cencode(library.sodium.crypto_generichash(20, utility.b58cdecode(sk, prefix.edsk).slice(32)), prefix.tz1),
+      sk : sk
+    };
+  },
   generateMnemonic : function(){
     return library.bip39.generateMnemonic(160)
   },
@@ -305,6 +315,7 @@ node = {
     return new Promise(function (resolve, reject) {
       var http = new XMLHttpRequest();
       http.open("POST", node.activeProvider + e, node.async);
+      http.setRequestHeader('Content-Type', 'application/json');
       http.onload = function() {
           if(http.status == 200) {
             if (node.debugMode)
@@ -430,7 +441,6 @@ rpc = {
         counter = f[1].counter +1;
         opOb['fee'] = fee;
         opOb['counter'] = counter;
-        //opOb['public_key'] = keys.pk;
       }
       return node.query('/blocks/prevalidation/proto/helpers/forge/forge/operations', opOb);
     })
@@ -544,6 +554,19 @@ rpc = {
   }
 },
 contract = {
+  hash : function(operationHash, ind){
+    var ob = utility.b58cdecode(operationHash, prefix.o), tt = [], i=0;
+    for(; i<ob.length; i++){
+      tt.push(ob[i]);
+    }
+    tt = tt.concat([
+     (ind & 0xff000000) >> 24,
+     (ind & 0x00ff0000) >> 16,
+     (ind & 0x0000ff00) >> 8,
+     (ind & 0x000000ff)
+    ]);
+    return utility.b58cencode(library.sodium.crypto_generichash(20, new Uint8Array(tt)), prefix.TZ);
+  },
   originate : function(keys, amount, code, init, spendable, delegatable, delegate, fee){
     return rpc.originate(keys, amount, code, init, spendable, delegatable, delegate, fee);
   },
