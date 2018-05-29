@@ -1,5 +1,5 @@
 const Buffer = require('buffer/').Buffer,
-  defaultProvider = "https://tezrpc.me",
+  defaultProvider = "https://tezrpc.me/zeronet",
   library = {
     bs58check: require('bs58check'),
     sodium: require('libsodium-wrappers'),
@@ -10,6 +10,7 @@ const Buffer = require('buffer/').Buffer,
     tz1: new Uint8Array([6, 161, 159]),
     edpk: new Uint8Array([13, 15, 37, 217]),
     edsk: new Uint8Array([43, 246, 78, 7]),
+    edsk2: new Uint8Array([13, 15, 58, 7]),
     edsig: new Uint8Array([9, 245, 205, 134, 18]),
     nce: new Uint8Array([69, 220, 169]),
     b: new Uint8Array([1,52]),
@@ -212,6 +213,15 @@ utility = {
         pk : utility.b58cencode(utility.b58cdecode(sk, prefix.edsk).slice(32), prefix.edpk),
         pkh : utility.b58cencode(library.sodium.crypto_generichash(20, utility.b58cdecode(sk, prefix.edsk).slice(32)), prefix.tz1),
         sk : sk
+      };
+    },
+    extractKeysShort : function(sk){
+      const s = utility.b58cdecode(sk, prefix.edsk2);
+      const kp = library.sodium.crypto_sign_seed_keypair(s);
+      return {
+        sk: utility.b58cencode(kp.privateKey, prefix.edsk),
+        pk: utility.b58cencode(kp.publicKey, prefix.edpk),
+        pkh: utility.b58cencode(library.sodium.crypto_generichash(20, kp.publicKey), prefix.tz1),
       };
     },
     generateMnemonic: () => library.bip39.generateMnemonic(160),
