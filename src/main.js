@@ -55,7 +55,7 @@ utility = {
     n.set(payload, prefix.length);
     return library.bs58check.encode(new Buffer(n, 'hex'));
   },
-  b58cdecode: (enc, prefix) => library.bs58check.decode(enc).slice(prefix.length),
+  b58cdecode: function(enc, prefix) { return library.bs58check.decode(enc).slice(prefix.length)},
   buf2hex: function (buffer) {
     const byteArray = new Uint8Array(buffer), hexParts = [];
     for (let i = 0; i < byteArray.length; i++) {
@@ -107,6 +107,9 @@ utility = {
           if (val === parseInt(val).toString()) {
             if (!ret.prim) return {"int": val};
             else ret.args.push({"int": val});
+          } else if (val[0] == '0') {
+            if (!ret.prim) return {"bytes": val};
+            else ret.args.push({"bytes": val});
           } else if (ret.prim) {
             ret.args.push(me(val));
           } else {
@@ -352,36 +355,42 @@ node = {
         t = 'POST';
     }
     return new Promise(function (resolve, reject) {
-      const http = new XMLHttpRequest();
-      http.open(t, node.activeProvider + e, node.async);
-      http.onload = function () {
-        if (http.status === 200) {
+      try {
+        const http = new XMLHttpRequest();
+        http.open(t, node.activeProvider + e, node.async);
+        http.onload = function () {
           if (node.debugMode)
             console.log(e, o, http.responseText);
-          if (http.responseText) {
-            let r = JSON.parse(http.responseText);
-            if (typeof r.error !== 'undefined') {
-              reject(r.error);
+          if (http.status === 200) {
+            if (http.responseText) {
+              let r = JSON.parse(http.responseText);
+              if (typeof r.error !== 'undefined') {
+                reject(r.error);
+              } else {
+                if (typeof r.ok !== 'undefined') r = r.ok;
+                resolve(r);
+              }
             } else {
-              if (typeof r.ok !== 'undefined') r = r.ok;
-              resolve(r);
+              reject("Empty response returned");
             }
           } else {
-            reject("Empty response returned");
+            if (http.responseText) {
+              reject(http.responseText);
+            } else {  
+              reject(http.statusText);
+            }
           }
-        } else {
+        };
+        http.onerror = function () {
           reject(http.statusText);
+        };
+        if (t == 'POST'){
+          http.setRequestHeader("Content-Type", "application/json");
+          http.send(JSON.stringify(o));        
+        } else {
+          http.send();
         }
-      };
-      http.onerror = function () {
-        reject(http.statusText);
-      };
-      if (t == 'POST'){
-        http.setRequestHeader("Content-Type", "application/json");
-        http.send(JSON.stringify(o));        
-      } else {
-        http.send();
-      }
+      } catch(e) { reject(e)}
     });
   }
 },
@@ -446,7 +455,7 @@ node = {
             kind : "reveal",
             fee : 0,
             public_key : keys.pk,
-            source : keys.pkh,
+            source : from,
           });
         }
         counter = parseInt(f[1]) + 1;
@@ -470,6 +479,7 @@ node = {
           "branch": head.hash,
           "contents": ops
         }
+        console.log(opOb);
         return node.query('/chains/'+head.chain_id+'/blocks/'+head.hash+'/helpers/forge/operations', opOb);
       })
       .then(function (f) {
@@ -512,15 +522,15 @@ node = {
       };
       return rpc.sendOperation(from, operation, keys);
     },
-    activate: function (keys, pkh, secret) {
+    activate: function (keys, secret) {
       var operation = {
         "kind": "activate_account",
-        "pkh" : pkh,
+        "pkh" : keys.pkh,
         "secret": secret,
       };
       return rpc.sendOperation(keys.pkh, operation, keys);
     },
-    originate: function (from, keys, amount, code, init, spendable, delegatable, delegate, fee) {
+    originate: function (keys, amount, code, init, spendable, delegatable, delegate, fee) {
       var _code = utility.ml2mic(code), script = {
         code: _code,
         storage: utility.sexp2mic(init)
@@ -536,7 +546,7 @@ node = {
         "delegate": (typeof delegate != "undefined" && delegate ? delegate : keys.pkh),
         "script": script,
       };
-      return rpc.sendOperation(from, operation, keys);
+      return rpc.sendOperation(keys.pkh, operation, keys);
     },
     setDelegate(from, keys, delegate, fee) {
       var operation = {
@@ -558,6 +568,14 @@ node = {
       var _code = utility.ml2mic(code);
       return node.query("/chains/main/blocks/head/helpers/scripts/typecheck_code", {program : _code, gas : "10000"});
     },
+    packData(data, type) {
+      var check = {
+        data: utility.sexp2mic(data),
+        type: utility.sexp2mic(type),
+        gas:"400000"
+      };
+      return node.query("/chains/main/blocks/head/helpers/scripts/pack_data", check);
+    },
     typecheckData(data, type) {
       var check = {
         data: utility.sexp2mic(data),
@@ -566,18 +584,9 @@ node = {
       };
       return node.query("/chains/main/blocks/head/helpers/scripts/typecheck_data", check);
     },
-    hashData(data, type) {
-     var check = {
-        data: utility.sexp2mic(data),
-        type: utility.sexp2mic(type),
-        gas:"400000"
-      };
-      return node.query("/chains/main/blocks/head/helpers/scripts/hash_data", check);
-    },
-    runCode(from, code, amount, input, storage, trace) {
-      var ep = (trace ? 'trace_code' : 'run_code');
+    runCode(code, amount, input, storage, trace) {
+      var ep = ((typeof trace != 'undefined' && trace) ? 'trace_code' : 'run_code');
       return node.query("/chains/main/blocks/head/helpers/scripts/" + ep, {
-        contract: from,
         script: utility.ml2mic(code),
         amount: utility.mutez(amount).toString(),
         input: utility.sexp2mic(input),
@@ -632,7 +641,7 @@ node = {
       return eztz.rpc.sendOperation(from, {
         "kind": "transaction",
         "fee" : fee.toString(),
-        "gas_limit": "200",
+        "gas_limit": "2000",
         "amount": utility.mutez(amount).toString(),
         "destination": contract,
         "parameters": eztz.utility.sexp2mic(parameter)
