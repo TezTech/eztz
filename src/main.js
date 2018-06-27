@@ -1,5 +1,5 @@
-const Buffer = require('buffer/').Buffer,
-  defaultProvider = "https://tezrpc.me/zeronet",
+if (typeof require == "undefined") require = require("buffer/").Buffer;
+const defaultProvider = "https://tezrpc.me/zeronet",
   library = {
     bs58check: require('bs58check'),
     sodium: require('libsodium-wrappers'),
@@ -8,22 +8,43 @@ const Buffer = require('buffer/').Buffer,
   },
   prefix = {
     tz1: new Uint8Array([6, 161, 159]),
-    tz2: new Uint8Array([6, 161, 159]), //coming soon
+    tz2: new Uint8Array([6, 161, 161]),
+    tz2: new Uint8Array([6, 161, 164]),
+    KT: new Uint8Array([2,90,121]),
+    
+    
     edpk: new Uint8Array([13, 15, 37, 217]),
-    edsk: new Uint8Array([43, 246, 78, 7]),
     edsk2: new Uint8Array([13, 15, 58, 7]),
+    spsk: new Uint8Array([17, 162, 224, 201]),
+    p2sk: new Uint8Array([16,81,238,189]),
+    
+    sppk: new Uint8Array([3, 254, 226, 86]),
+    p2pk: new Uint8Array([3, 178, 139, 127]),
+    
+    edsk: new Uint8Array([43, 246, 78, 7]),
     edsig: new Uint8Array([9, 245, 205, 134, 18]),
+    spsig1: new Uint8Array([13, 115, 101, 19, 63]),
+    p2sig: new Uint8Array([54, 240, 44, 52]),
+    sig: new Uint8Array([4, 130, 43]),
+    
+    Net: new Uint8Array([87, 82, 0]),
     nce: new Uint8Array([69, 220, 169]),
     b: new Uint8Array([1,52]),
     o: new Uint8Array([5, 116]),
-    TZ: new Uint8Array([3,99,29]),
+    Lo: new Uint8Array([133, 233]),
+    LLo: new Uint8Array([29, 159, 109]),
+    P: new Uint8Array([2, 170]),
+    Co: new Uint8Array([79, 179]),
+    id: new Uint8Array([153, 103]),
 },
   watermark = {
+    block: new Uint8Array([1]),
+    endorsement: new Uint8Array([2]),
     generic: new Uint8Array([3]),
   },
 utility = {
-  mintotz: m => parseInt(m) / 1000000,
-  tztomin: function (tz) {
+  totez: m => parseInt(m) / 1000000,
+  mutez: function (tz) {
     let r = tz.toFixed(6) * 1000000;
     if (r > 4294967296) r = r.toString();
     return r;
@@ -221,22 +242,32 @@ utility = {
     return s + (j ? i.substr(0, j) + t : "") + i.substr(j).replace(/(\d{3})(?=\d)/g, "$1" + t) + (c ? d + Math.abs(n - i).toFixed(c).slice(2) : "");
   }
 },
+//TODO: Add p256 and secp256k1 cryptographay
 crypto = {
   extractKeys : function(sk){
-    return {
-      pk : utility.b58cencode(utility.b58cdecode(sk, prefix.edsk).slice(32), prefix.edpk),
-      pkh : utility.b58cencode(library.sodium.crypto_generichash(20, utility.b58cdecode(sk, prefix.edsk).slice(32)), prefix.tz1),
-      sk : sk
-    };
-  },
-  extractKeysShort : function(sk){
-    const s = utility.b58cdecode(sk, prefix.edsk2);
-    const kp = library.sodium.crypto_sign_seed_keypair(s);
-    return {
-      sk: utility.b58cencode(kp.privateKey, prefix.edsk),
-      pk: utility.b58cencode(kp.publicKey, prefix.edpk),
-      pkh: utility.b58cencode(library.sodium.crypto_generichash(20, kp.publicKey), prefix.tz1),
-    };
+    const pref = sk.substr(0,4);
+    switch(pref){
+      case "edsk":
+        if (sk.length == 98){
+          return {
+            pk : utility.b58cencode(utility.b58cdecode(sk, prefix.edsk).slice(32), prefix.edpk),
+            pkh : utility.b58cencode(library.sodium.crypto_generichash(20, utility.b58cdecode(sk, prefix.edsk).slice(32)), prefix.tz1),
+            sk : sk
+          };
+        } else if (sk.length == 54) { //seed
+          const s = utility.b58cdecode(sk, prefix.edsk2);
+          const kp = library.sodium.crypto_sign_seed_keypair(s);
+          return {
+            sk: utility.b58cencode(kp.privateKey, prefix.edsk),
+            pk: utility.b58cencode(kp.publicKey, prefix.edpk),
+            pkh: utility.b58cencode(library.sodium.crypto_generichash(20, kp.publicKey), prefix.tz1),
+          };
+        }
+      break;
+      default:
+        return false;
+      break;
+    }
   },
   generateMnemonic: () => library.bip39.generateMnemonic(160),
   checkAddress: function (a) {
@@ -251,20 +282,6 @@ crypto = {
   generateKeysNoSeed: function () {
     const kp = library.sodium.crypto_sign_keypair();
     return {
-      sk: utility.b58cencode(kp.privateKey, prefix.edsk),
-      pk: utility.b58cencode(kp.publicKey, prefix.edpk),
-      pkh: utility.b58cencode(library.sodium.crypto_generichash(20, kp.publicKey), prefix.tz1),
-    };
-  },
-  generateKeysSalted: function (m, p) {
-    const ss = Math.random().toString(36).slice(2);
-    const pp = library.pbkdf2.pbkdf2Sync(p, ss, 0, 32, 'sha512').toString();
-    const s = library.bip39.mnemonicToSeed(m, pp).slice(0, 32);
-    const kp = library.sodium.crypto_sign_seed_keypair(s);
-    return {
-      mnemonic: m,
-      passphrase: p,
-      salt: ss,
       sk: utility.b58cencode(kp.privateKey, prefix.edsk),
       pk: utility.b58cencode(kp.publicKey, prefix.edpk),
       pkh: utility.b58cencode(library.sodium.crypto_generichash(20, kp.publicKey), prefix.tz1),
@@ -324,11 +341,19 @@ node = {
   resetProvider: function () {
     node.activeProvider = defaultProvider;
   },
-  query: function (e, o) {
-    if (typeof o === 'undefined') o = {};
+  query: function (e, o, t) {
+    if (typeof o === 'undefined') {
+      if (typeof t === 'undefined') {
+        t = "GET";
+      } else 
+        o = {};
+    } else {
+      if (typeof t === 'undefined')
+        t = 'POST';
+    }
     return new Promise(function (resolve, reject) {
       const http = new XMLHttpRequest();
-      http.open("POST", node.activeProvider + e, node.async);
+      http.open(t, node.activeProvider + e, node.async);
       http.onload = function () {
         if (http.status === 200) {
           if (node.debugMode)
@@ -351,8 +376,12 @@ node = {
       http.onerror = function () {
         reject(http.statusText);
       };
-      http.setRequestHeader("Content-Type", "application/json");
-      http.send(JSON.stringify(o));
+      if (t == 'POST'){
+        http.setRequestHeader("Content-Type", "application/json");
+        http.send(JSON.stringify(o));        
+      } else {
+        http.send();
+      }
     });
   }
 },
@@ -362,12 +391,12 @@ node = {
         "kind": "origination",
         "fee": fee.toString(),
         "managerPubkey": keys.pkh,
-        "balance": utility.tztomin(amount).toString(),
+        "balance": utility.mutez(amount).toString(),
         "spendable": (typeof spendable !== "undefined" ? spendable : true),
         "delegatable": (typeof delegatable !== "undefined" ? delegatable : true),
         "delegate": (typeof delegate !== "undefined" ? delegate : keys.pkh),
       };
-      return rpc.sendOperation(operation, keys);
+      return rpc.sendOperation(keys.pkh, operation, keys);
     },
     getBalance: function (tz1) {
       return node.query("/chains/main/blocks/head/context/contracts/" + tz1 + "/balance").then(function (r) {
@@ -383,14 +412,17 @@ node = {
     getHead: function () {
       return node.query("/chains/main/blocks/head");
     },
+    getHeadHash: function () {
+      return node.query("/chains/main/blocks/head/hash");
+    },
     call: function (e, d) {
       return node.query(e, d);
     },
-    sendOperation: function (operation, keys) {
-      var head, counter, pred_block, sopbytes, returnedContracts, opOb, errors = [], opResponse = [];
+    sendOperation: function (from, operation, keys) {
+      var hash, counter, pred_block, sopbytes, returnedContracts, opOb, errors = [], opResponse = [];
       var promises = [], requiresReveal=false;
 
-      promises.push(node.query('/chains/main/blocks/head'));
+      promises.push(node.query('/chains/main/blocks/head/header'));
 
       if (Array.isArray(operation)) {
         ops = operation;
@@ -401,8 +433,8 @@ node = {
       for(let i = 0; i < ops.length; i++){
         if (['transaction','origination','delegation'].indexOf(ops[i].kind) >= 0){
           requiresReveal = true;
-          promises.push(node.query('/chains/main/blocks/head/context/contracts/' + keys.pkh + '/counter'));
-          promises.push(node.query('/chains/main/blocks/head/context/contracts/' + keys.pkh + '/manager_key'));
+          promises.push(node.query('/chains/main/blocks/head/context/contracts/' + from + '/counter'));
+          promises.push(node.query('/chains/main/blocks/head/context/contracts/' + from + '/manager_key'));
           break;
         }
       }
@@ -414,30 +446,31 @@ node = {
             kind : "reveal",
             fee : 0,
             public_key : keys.pk,
+            source : keys.pkh,
           });
         }
         counter = parseInt(f[1]) + 1;
         
         for(let i = 0; i < ops.length; i++){
-          if (['proposals','ballot','reveal','transaction','origination','delegation'].indexOf(ops[i].kind) >= 0)
-            if (typeof ops[i].source == 'undefined') ops[i].source = keys.pkh;
+          if (['proposals','ballot','transaction','origination','delegation'].indexOf(ops[i].kind) >= 0){
+            if (typeof ops[i].source == 'undefined') ops[i].source = from;
+          }
           if (['reveal', 'transaction','origination','delegation'].indexOf(ops[i].kind) >= 0) {
             if (typeof ops[i].gas_limit == 'undefined') ops[i].gas_limit = "0";
             if (typeof ops[i].storage_limit == 'undefined') ops[i].storage_limit = "0";
             ops[i].counter = (counter++).toString();
             
-           ops[i].fee = ops[i].fee.toString();
-           ops[i].gas_limit = ops[i].gas_limit.toString();
-           ops[i].storage_limit = ops[i].storage_limit.toString();
-           ops[i].counter = ops[i].counter.toString();
+             ops[i].fee = ops[i].fee.toString();
+             ops[i].gas_limit = ops[i].gas_limit.toString();
+             ops[i].storage_limit = ops[i].storage_limit.toString();
+             ops[i].counter = ops[i].counter.toString();
           }
         }
         opOb = {
           "branch": head.hash,
           "contents": ops
         }
-        console.log(opOb);
-        return node.query('/chains/main/blocks/head/helpers/forge/operations', opOb);
+        return node.query('/chains/'+head.chain_id+'/blocks/'+head.hash+'/helpers/forge/operations', opOb);
       })
       .then(function (f) {
         var opbytes = f;
@@ -446,7 +479,7 @@ node = {
         var oh = utility.b58cencode(library.sodium.crypto_generichash(32, utility.hex2buf(sopbytes)), prefix.o);
         opOb.protocol = "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK";
         opOb.signature = signed.edsig;
-        return node.query('/chains/main/blocks/head/helpers/preapply/operations', [opOb]);
+        return node.query('/chains/'+head.chain_id+'/blocks/'+head.hash+'/helpers/preapply/operations', [opOb]);
       })
       .then(function (f) {
         returnedContracts = f;
@@ -454,7 +487,7 @@ node = {
         for(var i = 0; i < f.length; i++){
           for(var j = 0; j < f[i].contents.length; j++){
             opResponse.push(f[i].contents[j]);
-            if (f[i].contents[j].metadata.operation_result.status == "failed")
+            if (typeof f[i].contents[j].metadata.operation_result != 'undefined' && f[i].contents[j].metadata.operation_result.status == "failed")
               errors = errors.concat(f[i].contents[j].metadata.operation_result.errors);
           }
         }        
@@ -469,17 +502,25 @@ node = {
         };
       });
     },
-    transfer: function (keys, from, to, amount, fee) {
+    transfer: function (from, keys, to, amount, fee) {
       var operation = {
         "kind": "transaction",
         "fee" : fee.toString(),
         "gas_limit": "200",
-        "amount": utility.tztomin(amount).toString(),
+        "amount": utility.mutez(amount).toString(),
         "destination": to
       };
-      return rpc.sendOperation(operation, {pk: keys.pk, pkh: from, sk: keys.sk});
+      return rpc.sendOperation(from, operation, keys);
     },
-    originate: function (keys, amount, code, init, spendable, delegatable, delegate, fee) {
+    activate: function (keys, pkh, secret) {
+      var operation = {
+        "kind": "activate_account",
+        "pkh" : pkh,
+        "secret": secret,
+      };
+      return rpc.sendOperation(keys.pkh, operation, keys);
+    },
+    originate: function (from, keys, amount, code, init, spendable, delegatable, delegate, fee) {
       var _code = utility.ml2mic(code), script = {
         code: _code,
         storage: utility.sexp2mic(init)
@@ -489,21 +530,21 @@ node = {
         "gas_limit": "10000",
         "storage_limit": "10000",
         "managerPubkey": keys.pkh,
-        "balance": utility.tztomin(amount).toString(),
+        "balance": utility.mutez(amount).toString(),
         "spendable": (typeof spendable != "undefined" ? spendable : false),
         "delegatable": (typeof delegatable != "undefined" ? delegatable : false),
         "delegate": (typeof delegate != "undefined" && delegate ? delegate : keys.pkh),
         "script": script,
       };
-      return rpc.sendOperation(operation, keys);
+      return rpc.sendOperation(from, operation, keys);
     },
-    setDelegate(keys, account, delegate, fee) {
+    setDelegate(from, keys, delegate, fee) {
       var operation = {
         "kind": "delegation",
         "fee" : fee.toString(),
         "delegate": (typeof delegate != "undefined" ? delegate : keys.pkh),
       };
-      return rpc.sendOperation(operation, {pk: keys.pk, pkh: account, sk: keys.sk});
+      return rpc.sendOperation(from, operation, keys);
     },
     registerDelegate(keys, fee) {
       var operation = {
@@ -511,7 +552,7 @@ node = {
         "fee" : fee.toString(),
         "delegate": keys.pkh,
       };
-      return rpc.sendOperation(operation, keys);
+      return rpc.sendOperation(keys.pkh, operation, keys);
     },
     typecheckCode(code) {
       var _code = utility.ml2mic(code);
@@ -538,13 +579,26 @@ node = {
       return node.query("/chains/main/blocks/head/helpers/scripts/" + ep, {
         contract: from,
         script: utility.ml2mic(code),
-        amount: utility.tztomin(amount).toString(),
+        amount: utility.mutez(amount).toString(),
         input: utility.sexp2mic(input),
         storage: utility.sexp2mic(storage),
       });
     }
   },
   contract = {
+    hash : function(operationHash, ind){
+      var ob = utility.b58cdecode(operationHash, prefix.o), tt = [], i=0;
+      for(; i<ob.length; i++){
+        tt.push(ob[i]);
+      }
+      tt = tt.concat([
+       (ind & 0xff000000) >> 24,
+       (ind & 0x00ff0000) >> 16,
+       (ind & 0x0000ff00) >> 8,
+       (ind & 0x000000ff)
+      ]);
+      return utility.b58cencode(library.sodium.crypto_generichash(20, new Uint8Array(tt)), prefix.TZ);
+    },
     originate: function (keys, amount, code, init, spendable, delegatable, delegate, fee) {
       return rpc.originate(keys, amount, code, init, spendable, delegatable, delegate, fee);
     },
@@ -574,22 +628,26 @@ node = {
       ct();
       return setInterval(ct, timeout * 1000);
     },
-    send: function (contract, keys, amount, parameter, fee) {
-      return eztz.rpc.sendOperation({
+    send: function (contract, from, keys, amount, parameter, fee) {
+      return eztz.rpc.sendOperation(from, {
         "kind": "transaction",
         "fee" : fee.toString(),
         "gas_limit": "200",
-        "amount": utility.tztomin(amount).toString(),
+        "amount": utility.mutez(amount).toString(),
         "destination": contract,
         "parameters": eztz.utility.sexp2mic(parameter)
       }, keys);
     }
   };
 
-//Legacy (for new micheline engine)
+//Legacy commands
 utility.ml2tzjson = utility.sexp2mic;
 utility.tzjson2arr = utility.mic2arr;
 utility.mlraw2json = utility.ml2mic;
+utility.mintotz = utility.totez;
+utility.tztomin = utility.mutez;
+prefix.TZ = new Uint8Array([2,90,121]);
+
 //Expose library
 eztz = {
   library: library,
