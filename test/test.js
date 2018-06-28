@@ -6,15 +6,15 @@ describe('main', () => {
     test('mintotz', () => {
       const num1 = 1000000;
       const num2 = 9000000;
-      expect(utility.mintotz(num1)).toBe(1);
-      expect(utility.mintotz(num2)).toBe(9);
+      expect(utility.totez(num1)).toBe(1);
+      expect(utility.totez(num2)).toBe(9);
     });
 
-    test('tztomin', () => {
+    test('mutez', () => {
       const num = 0.000001;
       const num2 = 4294.967297;
-      expect(utility.tztomin(num)).toBe(1);
-      expect(utility.tztomin(num2)).toBe("4294967297");
+      expect(utility.mutez(num)).toBe(1);
+      expect(utility.mutez(num2)).toBe("4294967297");
     });
 
     test('b58cencode', () => {

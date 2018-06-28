@@ -1,5 +1,5 @@
 if (typeof require == "undefined") require = require("buffer/").Buffer;
-const defaultProvider = "https://tezrpc.me/zeronet",
+const defaultProvider = "http://45.56.83.80:3000",
   library = {
     bs58check: require('bs58check'),
     sodium: require('libsodium-wrappers'),
@@ -479,7 +479,6 @@ node = {
           "branch": head.hash,
           "contents": ops
         }
-        console.log(opOb);
         return node.query('/chains/'+head.chain_id+'/blocks/'+head.hash+'/helpers/forge/operations', opOb);
       })
       .then(function (f) {
