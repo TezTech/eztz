@@ -9,7 +9,7 @@ const defaultProvider = "http://45.56.83.80:3000",
   prefix = {
     tz1: new Uint8Array([6, 161, 159]),
     tz2: new Uint8Array([6, 161, 161]),
-    tz2: new Uint8Array([6, 161, 164]),
+    tz3: new Uint8Array([6, 161, 164]),
     KT: new Uint8Array([2,90,121]),
     
     
