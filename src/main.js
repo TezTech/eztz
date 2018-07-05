@@ -1,47 +1,49 @@
 if (typeof require == "undefined") require = require("buffer/").Buffer;
-const defaultProvider = "http://45.56.83.80:3000",
-  library = {
-    bs58check: require('bs58check'),
-    sodium: require('libsodium-wrappers'),
-    bip39: require('bip39'),
-    pbkdf2: require('pbkdf2'),
-  },
-  prefix = {
-    tz1: new Uint8Array([6, 161, 159]),
-    tz2: new Uint8Array([6, 161, 161]),
-    tz2: new Uint8Array([6, 161, 164]),
-    KT: new Uint8Array([2,90,121]),
-    
-    
-    edpk: new Uint8Array([13, 15, 37, 217]),
-    edsk2: new Uint8Array([13, 15, 58, 7]),
-    spsk: new Uint8Array([17, 162, 224, 201]),
-    p2sk: new Uint8Array([16,81,238,189]),
-    
-    sppk: new Uint8Array([3, 254, 226, 86]),
-    p2pk: new Uint8Array([3, 178, 139, 127]),
-    
-    edsk: new Uint8Array([43, 246, 78, 7]),
-    edsig: new Uint8Array([9, 245, 205, 134, 18]),
-    spsig1: new Uint8Array([13, 115, 101, 19, 63]),
-    p2sig: new Uint8Array([54, 240, 44, 52]),
-    sig: new Uint8Array([4, 130, 43]),
-    
-    Net: new Uint8Array([87, 82, 0]),
-    nce: new Uint8Array([69, 220, 169]),
-    b: new Uint8Array([1,52]),
-    o: new Uint8Array([5, 116]),
-    Lo: new Uint8Array([133, 233]),
-    LLo: new Uint8Array([29, 159, 109]),
-    P: new Uint8Array([2, 170]),
-    Co: new Uint8Array([79, 179]),
-    id: new Uint8Array([153, 103]),
+const 
+//CLI below
+defaultProvider = "https://rpc.tezrpc.me/",
+library = {
+  bs58check: require('bs58check'),
+  sodium: require('libsodium-wrappers'),
+  bip39: require('bip39'),
+  pbkdf2: require('pbkdf2'),
 },
-  watermark = {
-    block: new Uint8Array([1]),
-    endorsement: new Uint8Array([2]),
-    generic: new Uint8Array([3]),
-  },
+prefix = {
+  tz1: new Uint8Array([6, 161, 159]),
+  tz2: new Uint8Array([6, 161, 161]),
+  tz2: new Uint8Array([6, 161, 164]),
+  KT: new Uint8Array([2,90,121]),
+  
+  
+  edpk: new Uint8Array([13, 15, 37, 217]),
+  edsk2: new Uint8Array([13, 15, 58, 7]),
+  spsk: new Uint8Array([17, 162, 224, 201]),
+  p2sk: new Uint8Array([16,81,238,189]),
+  
+  sppk: new Uint8Array([3, 254, 226, 86]),
+  p2pk: new Uint8Array([3, 178, 139, 127]),
+  
+  edsk: new Uint8Array([43, 246, 78, 7]),
+  edsig: new Uint8Array([9, 245, 205, 134, 18]),
+  spsig1: new Uint8Array([13, 115, 101, 19, 63]),
+  p2sig: new Uint8Array([54, 240, 44, 52]),
+  sig: new Uint8Array([4, 130, 43]),
+  
+  Net: new Uint8Array([87, 82, 0]),
+  nce: new Uint8Array([69, 220, 169]),
+  b: new Uint8Array([1,52]),
+  o: new Uint8Array([5, 116]),
+  Lo: new Uint8Array([133, 233]),
+  LLo: new Uint8Array([29, 159, 109]),
+  P: new Uint8Array([2, 170]),
+  Co: new Uint8Array([79, 179]),
+  id: new Uint8Array([153, 103]),
+},
+watermark = {
+  block: new Uint8Array([1]),
+  endorsement: new Uint8Array([2]),
+  generic: new Uint8Array([3]),
+},
 utility = {
   totez: m => parseInt(m) / 1000000,
   mutez: function (tz) {
@@ -358,9 +360,9 @@ node = {
       try {
         const http = new XMLHttpRequest();
         http.open(t, node.activeProvider + e, node.async);
+        if (node.debugMode)
+          console.log(e, o, http.responseText);
         http.onload = function () {
-          if (node.debugMode)
-            console.log(e, o, http.responseText);
           if (http.status === 200) {
             if (http.responseText) {
               let r = JSON.parse(http.responseText);
@@ -382,6 +384,8 @@ node = {
           }
         };
         http.onerror = function () {
+          if (node.debugMode)
+            console.log(e, o, http.responseText);
           reject(http.statusText);
         };
         if (t == 'POST'){
@@ -394,261 +398,281 @@ node = {
     });
   }
 },
-  rpc = {
-    account: function (keys, amount, spendable, delegatable, delegate, fee) {
-      const operation = {
-        "kind": "origination",
-        "fee": fee.toString(),
-        "managerPubkey": keys.pkh,
-        "balance": utility.mutez(amount).toString(),
-        "spendable": (typeof spendable !== "undefined" ? spendable : true),
-        "delegatable": (typeof delegatable !== "undefined" ? delegatable : true),
-        "delegate": (typeof delegate !== "undefined" ? delegate : keys.pkh),
-      };
-      return rpc.sendOperation(keys.pkh, operation, keys);
-    },
-    getBalance: function (tz1) {
-      return node.query("/chains/main/blocks/head/context/contracts/" + tz1 + "/balance").then(function (r) {
-        return r;
-      });
-    },
-    getDelegate: function (tz1) {
-      return node.query("/chains/main/blocks/head/context/contracts/" + tz1 + "/delegate").then(function(r){
-        if (r) return r;
-        return false;
-      }).catch(function(){return false});
-    },
-    getHead: function () {
-      return node.query("/chains/main/blocks/head");
-    },
-    getHeadHash: function () {
-      return node.query("/chains/main/blocks/head/hash");
-    },
-    call: function (e, d) {
-      return node.query(e, d);
-    },
-    sendOperation: function (from, operation, keys) {
-      var hash, counter, pred_block, sopbytes, returnedContracts, opOb, errors = [], opResponse = [];
-      var promises = [], requiresReveal=false;
+rpc = {
+  account: function (keys, amount, spendable, delegatable, delegate, fee) {
+    const operation = {
+      "kind": "origination",
+      "fee": fee.toString(),
+      "managerPubkey": keys.pkh,
+      "balance": utility.mutez(amount).toString(),
+      "spendable": (typeof spendable !== "undefined" ? spendable : true),
+      "delegatable": (typeof delegatable !== "undefined" ? delegatable : true),
+      "delegate": (typeof delegate !== "undefined" ? delegate : keys.pkh),
+    };
+    return rpc.sendOperation(keys.pkh, operation, keys);
+  },
+  getBalance: function (tz1) {
+    return node.query("/chains/main/blocks/head/context/contracts/" + tz1 + "/balance").then(function (r) {
+      return r;
+    });
+  },
+  getDelegate: function (tz1) {
+    return node.query("/chains/main/blocks/head/context/contracts/" + tz1 + "/delegate").then(function(r){
+      if (r) return r;
+      return false;
+    }).catch(function(){return false});
+  },
+  getHead: function () {
+    return node.query("/chains/main/blocks/head");
+  },
+  getHeadHash: function () {
+    return node.query("/chains/main/blocks/head/hash");
+  },
+  call: function (e, d) {
+    return node.query(e, d);
+  },
+  sendOperation: function (from, operation, keys) {
+    if (typeof keys == 'undefined') keys = false;
+    var hash, counter, pred_block, sopbytes, returnedContracts, opOb, errors = [], opResponse = [];
+    var promises = [], requiresReveal=false;
 
-      promises.push(node.query('/chains/main/blocks/head/header'));
+    promises.push(node.query('/chains/main/blocks/head/header'));
 
-      if (Array.isArray(operation)) {
-        ops = operation;
-      } else {
-        ops = [operation];
+    if (Array.isArray(operation)) {
+      ops = operation;
+    } else {
+      ops = [operation];
+    }
+   
+    for(let i = 0; i < ops.length; i++){
+      if (['transaction','origination','delegation'].indexOf(ops[i].kind) >= 0){
+        requiresReveal = true;
+        promises.push(node.query('/chains/main/blocks/head/context/contracts/' + from + '/counter'));
+        promises.push(node.query('/chains/main/blocks/head/context/contracts/' + from + '/manager_key'));
+        break;
       }
-     
+    }
+
+    return Promise.all(promises).then(function (f) {
+      head = f[0];
+      if (requiresReveal && keys && typeof f[2].key == 'undefined'){
+        ops.unshift({
+          kind : "reveal",
+          fee : 0,
+          public_key : keys.pk,
+          source : from,
+        });
+      }
+      counter = parseInt(f[1]) + 1;
+      
       for(let i = 0; i < ops.length; i++){
-        if (['transaction','origination','delegation'].indexOf(ops[i].kind) >= 0){
-          requiresReveal = true;
-          promises.push(node.query('/chains/main/blocks/head/context/contracts/' + from + '/counter'));
-          promises.push(node.query('/chains/main/blocks/head/context/contracts/' + from + '/manager_key'));
-          break;
+        if (['proposals','ballot','transaction','origination','delegation'].indexOf(ops[i].kind) >= 0){
+          if (typeof ops[i].source == 'undefined') ops[i].source = from;
+        }
+        if (['reveal', 'transaction','origination','delegation'].indexOf(ops[i].kind) >= 0) {
+          if (typeof ops[i].gas_limit == 'undefined') ops[i].gas_limit = "0";
+          if (typeof ops[i].storage_limit == 'undefined') ops[i].storage_limit = "0";
+          ops[i].counter = (counter++).toString();
+          
+           ops[i].fee = ops[i].fee.toString();
+           ops[i].gas_limit = ops[i].gas_limit.toString();
+           ops[i].storage_limit = ops[i].storage_limit.toString();
+           ops[i].counter = ops[i].counter.toString();
         }
       }
-
-      return Promise.all(promises).then(function (f) {
-        head = f[0];
-        if (requiresReveal && typeof f[2].key == 'undefined'){
-          ops.unshift({
-            kind : "reveal",
-            fee : 0,
-            public_key : keys.pk,
-            source : from,
-          });
-        }
-        counter = parseInt(f[1]) + 1;
-        
-        for(let i = 0; i < ops.length; i++){
-          if (['proposals','ballot','transaction','origination','delegation'].indexOf(ops[i].kind) >= 0){
-            if (typeof ops[i].source == 'undefined') ops[i].source = from;
-          }
-          if (['reveal', 'transaction','origination','delegation'].indexOf(ops[i].kind) >= 0) {
-            if (typeof ops[i].gas_limit == 'undefined') ops[i].gas_limit = "0";
-            if (typeof ops[i].storage_limit == 'undefined') ops[i].storage_limit = "0";
-            ops[i].counter = (counter++).toString();
-            
-             ops[i].fee = ops[i].fee.toString();
-             ops[i].gas_limit = ops[i].gas_limit.toString();
-             ops[i].storage_limit = ops[i].storage_limit.toString();
-             ops[i].counter = ops[i].counter.toString();
-          }
-        }
-        opOb = {
-          "branch": head.hash,
-          "contents": ops
-        }
-        return node.query('/chains/'+head.chain_id+'/blocks/'+head.hash+'/helpers/forge/operations', opOb);
-      })
-      .then(function (f) {
-        var opbytes = f;
+      opOb = {
+        "branch": head.hash,
+        "contents": ops
+      }
+      return node.query('/chains/'+head.chain_id+'/blocks/'+head.hash+'/helpers/forge/operations', opOb);
+    })
+    .then(function (f) {
+      var opbytes = f;
+      opOb.protocol = "PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY";
+      if (!keys) {
+        sopbytes = opbytes + "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
+        opOb.signature = "edsigtXomBKi5CTRf5cjATJWSyaRvhfYNHqSUGrn4SdbYRcGwQrUGjzEfQDTuqHhuA8b2d8NarZjz8TRf65WkpQmo423BtomS8Q";
+      } else {
         var signed = crypto.sign(opbytes, keys.sk, watermark.generic);
         sopbytes = signed.sbytes;
-        var oh = utility.b58cencode(library.sodium.crypto_generichash(32, utility.hex2buf(sopbytes)), prefix.o);
-        opOb.protocol = "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK";
         opOb.signature = signed.edsig;
-        return node.query('/chains/'+head.chain_id+'/blocks/'+head.hash+'/helpers/preapply/operations', [opOb]);
-      })
-      .then(function (f) {
-        returnedContracts = f;
-        if (!Array.isArray(f)) throw {error: "RPC Fail", errors:[]};
-        for(var i = 0; i < f.length; i++){
-          for(var j = 0; j < f[i].contents.length; j++){
-            opResponse.push(f[i].contents[j]);
-            if (typeof f[i].contents[j].metadata.operation_result != 'undefined' && f[i].contents[j].metadata.operation_result.status == "failed")
-              errors = errors.concat(f[i].contents[j].metadata.operation_result.errors);
-          }
-        }        
-        if (errors.length) throw {error: "Operation Failed", errors:errors};
-        return node.query('/injection/operation', sopbytes);
-      })
-      .then(function (f) {
-        
-        return {
-          hash : f,
-          operations : opResponse
-        };
-      });
-    },
-    transfer: function (from, keys, to, amount, fee) {
-      var operation = {
-        "kind": "transaction",
-        "fee" : fee.toString(),
-        "gas_limit": "200",
-        "amount": utility.mutez(amount).toString(),
-        "destination": to
-      };
-      return rpc.sendOperation(from, operation, keys);
-    },
-    activate: function (keys, secret) {
-      var operation = {
-        "kind": "activate_account",
-        "pkh" : keys.pkh,
-        "secret": secret,
-      };
-      return rpc.sendOperation(keys.pkh, operation, keys);
-    },
-    originate: function (keys, amount, code, init, spendable, delegatable, delegate, fee) {
-      var _code = utility.ml2mic(code), script = {
-        code: _code,
-        storage: utility.sexp2mic(init)
-      }, operation = {
-        "kind": "origination",
-        "fee" : fee.toString(),
-        "gas_limit": "10000",
-        "storage_limit": "10000",
-        "managerPubkey": keys.pkh,
-        "balance": utility.mutez(amount).toString(),
-        "spendable": (typeof spendable != "undefined" ? spendable : false),
-        "delegatable": (typeof delegatable != "undefined" ? delegatable : false),
-        "delegate": (typeof delegate != "undefined" && delegate ? delegate : keys.pkh),
-        "script": script,
-      };
-      return rpc.sendOperation(keys.pkh, operation, keys);
-    },
-    setDelegate(from, keys, delegate, fee) {
-      var operation = {
-        "kind": "delegation",
-        "fee" : fee.toString(),
-        "delegate": (typeof delegate != "undefined" ? delegate : keys.pkh),
-      };
-      return rpc.sendOperation(from, operation, keys);
-    },
-    registerDelegate(keys, fee) {
-      var operation = {
-        "kind": "delegation",
-        "fee" : fee.toString(),
-        "delegate": keys.pkh,
-      };
-      return rpc.sendOperation(keys.pkh, operation, keys);
-    },
-    typecheckCode(code) {
-      var _code = utility.ml2mic(code);
-      return node.query("/chains/main/blocks/head/helpers/scripts/typecheck_code", {program : _code, gas : "10000"});
-    },
-    packData(data, type) {
-      var check = {
-        data: utility.sexp2mic(data),
-        type: utility.sexp2mic(type),
-        gas:"400000"
-      };
-      return node.query("/chains/main/blocks/head/helpers/scripts/pack_data", check);
-    },
-    typecheckData(data, type) {
-      var check = {
-        data: utility.sexp2mic(data),
-        type: utility.sexp2mic(type),
-        gas:"400000"
-      };
-      return node.query("/chains/main/blocks/head/helpers/scripts/typecheck_data", check);
-    },
-    runCode(code, amount, input, storage, trace) {
-      var ep = ((typeof trace != 'undefined' && trace) ? 'trace_code' : 'run_code');
-      return node.query("/chains/main/blocks/head/helpers/scripts/" + ep, {
-        script: utility.ml2mic(code),
-        amount: utility.mutez(amount).toString(),
-        input: utility.sexp2mic(input),
-        storage: utility.sexp2mic(storage),
-      });
-    }
-  },
-  contract = {
-    hash : function(operationHash, ind){
-      var ob = utility.b58cdecode(operationHash, prefix.o), tt = [], i=0;
-      for(; i<ob.length; i++){
-        tt.push(ob[i]);
       }
-      tt = tt.concat([
-       (ind & 0xff000000) >> 24,
-       (ind & 0x00ff0000) >> 16,
-       (ind & 0x0000ff00) >> 8,
-       (ind & 0x000000ff)
-      ]);
-      return utility.b58cencode(library.sodium.crypto_generichash(20, new Uint8Array(tt)), prefix.TZ);
-    },
-    originate: function (keys, amount, code, init, spendable, delegatable, delegate, fee) {
-      return rpc.originate(keys, amount, code, init, spendable, delegatable, delegate, fee);
-    },
-    storage: function (contract) {
-      return new Promise(function (resolve, reject) {
-        eztz.node.query("/chains/main/blocks/head/context/contracts/" + contract + 
-        "/storage").then(function (r) {
-          resolve(r);
-        }).catch(function (e) {
-          reject(e);
-        });
-      });
-    },
-    load: function (contract) {
-      return eztz.node.query("/chains/main/blocks/head/context/contracts/" + contract);
-    },
-    watch: function (cc, timeout, cb) {
-      let storage = [];
-      const ct = function () {
-        contract.storage(cc).then(function (r) {
-          if (JSON.stringify(storage) != JSON.stringify(r)) {
-            storage = r;
-            cb(storage);
-          }
-        });
+      return node.query('/chains/main/blocks/head/helpers/preapply/operations', [opOb]);
+    })
+    .then(function (f) {
+      if (!Array.isArray(f)) throw {error: "RPC Fail", errors:[]};
+      for(var i = 0; i < f.length; i++){
+        for(var j = 0; j < f[i].contents.length; j++){
+          opResponse.push(f[i].contents[j]);
+          if (typeof f[i].contents[j].metadata.operation_result != 'undefined' && f[i].contents[j].metadata.operation_result.status == "failed")
+            errors = errors.concat(f[i].contents[j].metadata.operation_result.errors);
+        }
+      }        
+      if (errors.length) throw {error: "Operation Failed", errors:errors};
+      return node.query('/injection/operation', sopbytes);
+    })
+    .then(function (f) {
+      return {
+        hash : f,
+        operations : opResponse
       };
-      ct();
-      return setInterval(ct, timeout * 1000);
-    },
-    send: function (contract, from, keys, amount, parameter, fee) {
-      return eztz.rpc.sendOperation(from, {
-        "kind": "transaction",
-        "fee" : fee.toString(),
-        "gas_limit": "2000",
-        "amount": utility.mutez(amount).toString(),
-        "destination": contract,
-        "parameters": eztz.utility.sexp2mic(parameter)
-      }, keys);
+    });
+  },
+  transfer: function (from, keys, to, amount, fee, parameter, gasLimit, storageLimit) {
+    if (typeof gasLimit == 'undefined') gasLimit = '200';
+    if (typeof storageLimit == 'undefined') storageLimit = '0';
+    var operation = {
+      "kind": "transaction",
+      "fee" : fee.toString(),
+      "gas_limit": gasLimit,
+      "storage_limit": storageLimit,
+      "amount": utility.mutez(amount).toString(),
+      "destination": to
+    };
+    if (typeof parameter == 'undefined') parameter = false;
+    if (parameter){
+      operation.parameters = eztz.utility.sexp2mic(parameter);
     }
-  };
+    return rpc.sendOperation(from, operation, keys);
+  },
+  activate: function (pkh, secret) {
+    var operation = {
+      "kind": "activate_account",
+      "pkh" : pkh,
+      "secret": secret,
+    };
+    return rpc.sendOperation(pkh, operation, false);
+  },
+  originate: function (keys, amount, code, init, spendable, delegatable, delegate, fee, gasLimit, storageLimit) {
+    if (typeof gasLimit == 'undefined') gasLimit = '10000';
+    if (typeof storageLimit == 'undefined') storageLimit = '10000';
+    var _code = utility.ml2mic(code), script = {
+      code: _code,
+      storage: utility.sexp2mic(init)
+    }, operation = {
+      "kind": "origination",
+      "fee" : fee.toString(),
+      "gas_limit": gasLimit,
+      "storage_limit": storageLimit,
+      "managerPubkey": keys.pkh,
+      "balance": utility.mutez(amount).toString(),
+      "spendable": (typeof spendable != "undefined" ? spendable : false),
+      "delegatable": (typeof delegatable != "undefined" ? delegatable : false),
+      "delegate": (typeof delegate != "undefined" && delegate ? delegate : keys.pkh),
+      "script": script,
+    };
+    return rpc.sendOperation(keys.pkh, operation, keys);
+  },
+  setDelegate(from, keys, delegate, fee, gasLimit, storageLimit) {
+    if (typeof gasLimit == 'undefined') gasLimit = '0';
+    if (typeof storageLimit == 'undefined') storageLimit = '0';
+    var operation = {
+      "kind": "delegation",
+      "fee" : fee.toString(),
+      "gas_limit": gasLimit,
+      "storage_limit": storageLimit,
+      "delegate": (typeof delegate != "undefined" ? delegate : keys.pkh),
+    };
+    return rpc.sendOperation(from, operation, keys);
+  },
+  registerDelegate(keys, fee, gasLimit, storageLimit) {
+    if (typeof gasLimit == 'undefined') gasLimit = '0';
+    if (typeof storageLimit == 'undefined') storageLimit = '0';
+    var operation = {
+      "kind": "delegation",
+      "fee" : fee.toString(),
+      "gas_limit": gasLimit,
+      "storage_limit": storageLimit,
+      "delegate": keys.pkh,
+    };
+    return rpc.sendOperation(keys.pkh, operation, keys);
+  },
+  typecheckCode(code) {
+    var _code = utility.ml2mic(code);
+    return node.query("/chains/main/blocks/head/helpers/scripts/typecheck_code", {program : _code, gas : "10000"});
+  },
+  packData(data, type) {
+    var check = {
+      data: utility.sexp2mic(data),
+      type: utility.sexp2mic(type),
+      gas:"400000"
+    };
+    return node.query("/chains/main/blocks/head/helpers/scripts/pack_data", check);
+  },
+  typecheckData(data, type) {
+    var check = {
+      data: utility.sexp2mic(data),
+      type: utility.sexp2mic(type),
+      gas:"400000"
+    };
+    return node.query("/chains/main/blocks/head/helpers/scripts/typecheck_data", check);
+  },
+  runCode(code, amount, input, storage, trace) {
+    var ep = ((typeof trace != 'undefined' && trace) ? 'trace_code' : 'run_code');
+    return node.query("/chains/main/blocks/head/helpers/scripts/" + ep, {
+      script: utility.ml2mic(code),
+      amount: utility.mutez(amount).toString(),
+      input: utility.sexp2mic(input),
+      storage: utility.sexp2mic(storage),
+    });
+  }
+},
+contract = {
+  hash : function(operationHash, ind){
+    var ob = utility.b58cdecode(operationHash, prefix.o), tt = [], i=0;
+    for(; i<ob.length; i++){
+      tt.push(ob[i]);
+    }
+    tt = tt.concat([
+     (ind & 0xff000000) >> 24,
+     (ind & 0x00ff0000) >> 16,
+     (ind & 0x0000ff00) >> 8,
+     (ind & 0x000000ff)
+    ]);
+    return utility.b58cencode(library.sodium.crypto_generichash(20, new Uint8Array(tt)), prefix.KT);
+  },
+  originate: function (keys, amount, code, init, spendable, delegatable, delegate, fee, gasLimit, storageLimit) {
+    if (typeof gasLimit == 'undefined') gasLimit = '10000';
+    if (typeof storageLimit == 'undefined') storageLimit = '10000';
+    return rpc.originate(keys, amount, code, init, spendable, delegatable, delegate, fee, gasLimit, storageLimit);
+  },
+  send: function (contract, from, keys, amount, parameter, fee, gasLimit, storageLimit) {      
+    if (typeof gasLimit == 'undefined') gasLimit = '2000';
+    if (typeof storageLimit == 'undefined') storageLimit = '0';
+    return rpc.transfer(from, keys, contract, amount, fee, parameter, gasLimit, storageLimit);
+  },
+  balance: function (contract) {
+    return rpc.getBalance(contract);
+  },
+  storage: function (contract) {
+    return new Promise(function (resolve, reject) {
+      eztz.node.query("/chains/main/blocks/head/context/contracts/" + contract + 
+      "/storage").then(function (r) {
+        resolve(r);
+      }).catch(function (e) {
+        reject(e);
+      });
+    });
+  },
+  load: function (contract) {
+    return eztz.node.query("/chains/main/blocks/head/context/contracts/" + contract);
+  },
+  watch: function (cc, timeout, cb) {
+    let storage = [];
+    const ct = function () {
+      contract.storage(cc).then(function (r) {
+        if (JSON.stringify(storage) != JSON.stringify(r)) {
+          storage = r;
+          cb(storage);
+        }
+      });
+    };
+    ct();
+    return setInterval(ct, timeout * 1000);
+  },
+};
 
-//Legacy commands
+//Legacy
 utility.ml2tzjson = utility.sexp2mic;
 utility.tzjson2arr = utility.mic2arr;
 utility.mlraw2json = utility.ml2mic;
