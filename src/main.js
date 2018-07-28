@@ -377,8 +377,12 @@ node = {
             }
           } else {
             if (http.responseText) {
+              if (node.debugMode)
+                console.log(e, o, http.responseText);
               reject(http.responseText);
             } else {  
+              if (node.debugMode)
+                console.log(e, o, http.statusText);
               reject(http.statusText);
             }
           }
@@ -488,7 +492,7 @@ rpc = {
     })
     .then(function (f) {
       var opbytes = f;
-      opOb.protocol = "PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY";
+      opOb.protocol = head.protocol;
       if (!keys) {
         sopbytes = opbytes + "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
         opOb.signature = "edsigtXomBKi5CTRf5cjATJWSyaRvhfYNHqSUGrn4SdbYRcGwQrUGjzEfQDTuqHhuA8b2d8NarZjz8TRf65WkpQmo423BtomS8Q";
@@ -551,16 +555,16 @@ rpc = {
       storage: utility.sexp2mic(init)
     }, operation = {
       "kind": "origination",
-      "fee" : fee.toString(),
-      "gas_limit": gasLimit,
-      "storage_limit": storageLimit,
-      "managerPubkey": keys.pkh,
       "balance": utility.mutez(amount).toString(),
-      "spendable": (typeof spendable != "undefined" ? spendable : false),
-      "delegatable": (typeof delegatable != "undefined" ? delegatable : false),
-      "delegate": (typeof delegate != "undefined" && delegate ? delegate : keys.pkh),
+      "managerPubkey": keys.pkh,
+      "storage_limit": storageLimit,
+      "gas_limit": gasLimit,
+      "fee" : fee.toString(),
       "script": script,
     };
+    if (typeof spendable != "undefined") operation.spendable = spendable;
+    if (typeof delegatable != "undefined") operation.delegatable = delegatable;
+    if (typeof delegate != "undefined" && delegate) operation.delegate = delegate;
     return rpc.sendOperation(keys.pkh, operation, keys);
   },
   setDelegate(from, keys, delegate, fee, gasLimit, storageLimit) {
