@@ -254,10 +254,11 @@ crypto = {
     switch(pref){
       case "edsk":
         if (sk.length == 98){
+          const kp = library.sodium.crypto_sign_seed_keypair(utility.b58cdecode(sk, prefix.edsk).slice(32));
           return {
-            pk : utility.b58cencode(utility.b58cdecode(sk, prefix.edsk).slice(32), prefix.edpk),
-            pkh : utility.b58cencode(library.sodium.crypto_generichash(20, utility.b58cdecode(sk, prefix.edsk).slice(32)), prefix.tz1),
-            sk : sk
+            sk: utility.b58cencode(kp.privateKey, prefix.edsk),
+            pk: utility.b58cencode(kp.publicKey, prefix.edpk),
+            pkh: utility.b58cencode(library.sodium.crypto_generichash(20, kp.publicKey), prefix.tz1)
           };
         } else if (sk.length == 54) { //seed
           const s = utility.b58cdecode(sk, prefix.edsk2);
