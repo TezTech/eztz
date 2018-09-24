@@ -1,7 +1,5 @@
-if (typeof require == "undefined") require = require("buffer/").Buffer;
-if (typeof XMLHttpRequest == "undefined") XMLHttpRequest = require('xhr2');;
-  
-
+if (typeof Buffer == "undefined") Buffer = require("buffer/").Buffer;
+if (typeof XMLHttpRequest == "undefined") XMLHttpRequest = require('xhr2');
 const 
 //CLI below
 defaultProvider = "https://rpc.tezrpc.me/",
