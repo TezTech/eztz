@@ -4,6 +4,9 @@ const
 //CLI below
 defaultProvider = "https://rpc.tezrpc.me/",
 library = {
+  ledgerjs: require('./ledger.xtz.js'),
+  ledgerjs2: require('./ledger.xtz.js').tezledger,
+  ledgerjs3: require('./ledger.xtz.js').default,
   bs58check: require('bs58check'),
   sodium: require('libsodium-wrappers'),
   bip39: require('bip39'),
