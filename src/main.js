@@ -1,7 +1,6 @@
-if (typeof require == "undefined") require = require("buffer/").Buffer;
-if (typeof XMLHttpRequest == "undefined") XMLHttpRequest = require('xhr2');;
-  
-
+if (typeof Buffer == "undefined") Buffer = require("buffer/").Buffer;
+if (typeof XMLHttpRequest == "undefined") XMLHttpRequest = require('xhr2');
+const BN = require("bignumber.js")
 const 
 //CLI below
 defaultProvider = "https://rpc.tezrpc.me/",
@@ -9,7 +8,7 @@ library = {
   bs58check: require('bs58check'),
   sodium: require('libsodium-wrappers'),
   bip39: require('bip39'),
-  pbkdf2: require('pbkdf2'),
+  pbkdf2: require('pbkdf2')
 },
 prefix = {
   tz1: new Uint8Array([6, 161, 159]),
@@ -50,9 +49,7 @@ watermark = {
 utility = {
   totez: m => parseInt(m) / 1000000,
   mutez: function (tz) {
-    let r = tz.toFixed(6) * 1000000;
-    if (r > 4294967296) r = r.toString();
-    return r;
+    return new BN(new BN(tz).toFixed(6)).multipliedBy(1000000).toString()
   },
   b58cencode: function (payload, prefix) {
     const n = new Uint8Array(prefix.length + payload.length);
