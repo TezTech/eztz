@@ -2,6 +2,7 @@
   "name": "eztz.js",
   "version": "0.0.1",
   "dependencies": {
+    "bignumber.js": "^7.2.1",
     "bip39": "^2.5.0",
     "bs58check": "^2.1.1",
     "buffer": "^5.1.0",
