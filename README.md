@@ -3,14 +3,14 @@
 [![Build
 Status](https://travis-ci.org/stephenandrews/eztz.svg?branch=master)](https://travis-ci.org/stephenandrews/eztz) [![codecov](https://codecov.io/gh/stephenandrews/eztz/branch/master/graph/badge.svg)](https://codecov.io/gh/stephenandrews/eztz)
 
-This library is compatible with the Tezos blockchain, implementing communication with the JSON RPC API and providing key generation, signing, verification, and contract interaction. Try our [Live demo](https://stephenandrews.github.io/eztz/) - it's eztz!
+This library is compatible with the Tezos blockchain, implementing communication with the JSON RPC API and providing key generation, signing, verification, and contract interaction. eztz.js is used by numerous projects, including TezBox and Bakechain.
 
 You can checkout our [Documentation](https://github.com/stephenandrews/eztz/wiki/Documentation), or follow installation below.
 
-**By default, eztz will connect to https://tezrpc.me - a network of community supplied Tezos nodes. You can switch this to use your own local node, or a node of your choosing, via eztz.node.setProvider(url).**
+**By default, eztz will connect to https://rpc.tezrpc.me - public Tezos infrastructure provided by TezTech. You can switch this to use your own local node, or a node of your choosing, via eztz.node.setProvider(url).**
 
 ## Installation
-In browser, just include eztz.js and you're good to go.
+In browser, just include dist/eztz.min.js and you're good to go.
 
 **NPM plugin in development**
 
@@ -24,7 +24,7 @@ npm run-script build
 ## Usage
 Include the eztz.js file and use the eztz object directly:
 ```html
-<script src="./eztz.js"></script>
+<script src="./eztz.min.js"></script>
 <script>
     eztz.rpc.getBalance("tz1LSAycAVcNdYnXCy18bwVksXci8gUC2YpA").then(function(res){
         alert("Your balance is " + res);
@@ -36,19 +36,22 @@ Include the eztz.js file and use the eztz object directly:
 
 ## Future Development
 Our current goals are:
-* Fine tune library
+* Add support for additional RPC endpoints (e.g. voting)
+* Hardware wallet support
+* Support for additional cryto curves
 * Add additional tests
 
 ## Contribute
 Please feel free to contribute - I will merge any pull requests as soon as I've gone through the changes.
 
 ## Author
-By Stephen Andrews, and produly developed at Cryptonomic!
+Originally developed by Stephen Andrews, eztz.js is now owned by TezTech.
 
 ## Support Us
-Please consider donating to help me develop this and other Tezos related tools, I currently rely on the kindness of others.
+Development is now funded by a generous grant from the Tezos Foundation. Donations are also welcone.
 
 Bitcoin: 1KSiyfgs5XwTZjaLpmCTHxonsyXMx383P1
+Tezos: tz1cLDXASgh48ntYmLqM3cqPEXmUtpJVVPma
 
 ## Credits
 https://github.com/bitcoinjs/bs58check (for base58check encode/decode)  

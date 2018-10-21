@@ -1,6 +1,6 @@
 if (typeof Buffer == "undefined") Buffer = require("buffer/").Buffer;
 if (typeof XMLHttpRequest == "undefined") XMLHttpRequest = require('xhr2');
-const BN = require("bignumber.js")
+const BN = require("bignumber.js");
 const 
 //CLI below
 defaultProvider = "https://rpc.tezrpc.me/",
@@ -24,6 +24,8 @@ prefix = {
   
   sppk: new Uint8Array([3, 254, 226, 86]),
   p2pk: new Uint8Array([3, 178, 139, 127]),
+  
+  edesk: new Uint8Array([7, 90, 60, 179, 41]),
   
   edsk: new Uint8Array([43, 246, 78, 7]),
   edsig: new Uint8Array([9, 245, 205, 134, 18]),
@@ -249,6 +251,38 @@ utility = {
 },
 //TODO: Add p256 and secp256k1 cryptographay
 crypto = {
+  extractEncryptedKeys : function(esk, password){
+    if (typeof esk == 'undefined') return false;
+    if (typeof password == 'undefined') return false;
+    if (typeof window.crypto.subtle == 'undefined') return false;
+    
+    const esb = utility.b58cdecode(esk, prefix.edesk);
+    const salt = esb.slice(0, 8);
+    const esm = esb.slice(8);
+    
+    return window.crypto.subtle.importKey('raw', new TextEncoder('utf-8').encode(password), {name: 'PBKDF2'}, false, ['deriveBits']).then(function(key){
+        console.log(key);
+      return window.crypto.subtle.deriveBits(
+        {
+          name: 'PBKDF2',
+          salt: salt,
+          iterations: 32768,
+          hash: {name: 'SHA-512'}
+        },
+        key,
+        256 
+      );
+    }).then(function(key){
+        console.log(key);
+        console.log(library.sodium.crypto_secretbox_open_easy(esm, new Uint8Array(24), new Uint8Array(key)));
+      const kp = library.sodium.crypto_sign_seed_keypair(library.sodium.crypto_secretbox_open_easy(esm, new Uint8Array(24), new Uint8Array(key)));
+      return {
+        sk: utility.b58cencode(kp.privateKey, prefix.edsk),
+        pk: utility.b58cencode(kp.publicKey, prefix.edpk),
+        pkh: utility.b58cencode(library.sodium.crypto_generichash(20, kp.publicKey), prefix.tz1),
+      };
+    });
+  },
   extractKeys : function(sk){
     const pref = sk.substr(0,4);
     switch(pref){
@@ -406,13 +440,13 @@ rpc = {
   account: function (keys, amount, spendable, delegatable, delegate, fee) {
     const operation = {
       "kind": "origination",
+      "balance": utility.mutez(amount).toString(),
       "fee": fee.toString(),
       "managerPubkey": keys.pkh,
-      "balance": utility.mutez(amount).toString(),
-      "spendable": (typeof spendable !== "undefined" ? spendable : true),
-      "delegatable": (typeof delegatable !== "undefined" ? delegatable : true),
-      "delegate": (typeof delegate !== "undefined" ? delegate : keys.pkh),
     };
+    if (typeof spendable != "undefined") operation.spendable = spendable;
+    if (typeof delegatable != "undefined") operation.delegatable = delegatable;
+    if (typeof delegate != "undefined" && delegate) operation.delegate = delegate;
     return rpc.sendOperation(keys.pkh, operation, keys);
   },
   getBalance: function (tz1) {
