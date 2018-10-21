@@ -1,12 +1,8 @@
 if (typeof Buffer == "undefined") Buffer = require("buffer/").Buffer;
-if (typeof XMLHttpRequest == "undefined") XMLHttpRequest = require('xhr2');
 const 
 //CLI below
 defaultProvider = "https://rpc.tezrpc.me/",
 library = {
-  ledgerjs: require('./ledger.xtz.js'),
-  ledgerjs2: require('./ledger.xtz.js').tezledger,
-  ledgerjs3: require('./ledger.xtz.js').default,
   bs58check: require('bs58check'),
   sodium: require('libsodium-wrappers'),
   bip39: require('bip39'),
@@ -475,7 +471,7 @@ rpc = {
   },
   sendOperation: function (from, operation, keys) {
     if (typeof keys == 'undefined') keys = false;
-    var hash, counter, pred_block, sopbytes, returnedContracts, opOb, errors = [], opResponse = [];
+    var hash, counter, pred_block, sopbytes, returnedContracts, opOb;
     var promises = [], requiresReveal=false;
 
     promises.push(node.query('/chains/main/blocks/head/header'));
@@ -531,17 +527,27 @@ rpc = {
     .then(function (f) {
       var opbytes = f;
       opOb.protocol = head.protocol;
-      if (!keys) {
-        sopbytes = opbytes + "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
-        opOb.signature = "edsigtXomBKi5CTRf5cjATJWSyaRvhfYNHqSUGrn4SdbYRcGwQrUGjzEfQDTuqHhuA8b2d8NarZjz8TRf65WkpQmo423BtomS8Q";
+      if (keys.sk === false) {
+        return {
+          opOb : opOb,
+          opbytes : opbytes
+        };
       } else {
-        var signed = crypto.sign(opbytes, keys.sk, watermark.generic);
-        sopbytes = signed.sbytes;
-        opOb.signature = signed.edsig;
+        if (!keys) {
+          sopbytes = opbytes + "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
+          opOb.signature = "edsigtXomBKi5CTRf5cjATJWSyaRvhfYNHqSUGrn4SdbYRcGwQrUGjzEfQDTuqHhuA8b2d8NarZjz8TRf65WkpQmo423BtomS8Q";
+        } else {
+          var signed = crypto.sign(opbytes, keys.sk, watermark.generic);
+          sopbytes = signed.sbytes;
+          opOb.signature = signed.edsig;
+        }
+        return rpc.inject(opOb, sopbytes);
       }
-      return node.query('/chains/main/blocks/head/helpers/preapply/operations', [opOb]);
     })
-    .then(function (f) {
+  },
+  inject: function(opOb, sopbytes){
+    var opResponse = [], errors = [];
+    return node.query('/chains/main/blocks/head/helpers/preapply/operations', [opOb]).then(function (f) {
       if (!Array.isArray(f)) throw {error: "RPC Fail", errors:[]};
       for(var i = 0; i < f.length; i++){
         for(var j = 0; j < f[i].contents.length; j++){
@@ -552,8 +558,7 @@ rpc = {
       }        
       if (errors.length) throw {error: "Operation Failed", errors:errors};
       return node.query('/injection/operation', sopbytes);
-    })
-    .then(function (f) {
+    }).then(function (f) {
       return {
         hash : f,
         operations : opResponse
