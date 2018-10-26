@@ -618,8 +618,10 @@ rpc = {
       "fee" : fee.toString(),
       "gas_limit": gasLimit,
       "storage_limit": storageLimit,
-      "delegate": (typeof delegate != "undefined" ? delegate : keys.pkh),
     };
+    if (typeof delegate != "undefined") {
+      operation.delegate = delegate;
+    }
     return rpc.sendOperation(from, operation, keys);
   },
   registerDelegate(keys, fee, gasLimit, storageLimit) {
