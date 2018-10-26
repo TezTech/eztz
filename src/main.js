@@ -619,7 +619,7 @@ rpc = {
       "gas_limit": gasLimit,
       "storage_limit": storageLimit,
     };
-    if (typeof delegate != "undefined") {
+    if (typeof delegate != "undefined" && delegate) {
       operation.delegate = delegate;
     }
     return rpc.sendOperation(from, operation, keys);
