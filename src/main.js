@@ -741,6 +741,19 @@ trezor = {
 			hash : bytes
 		};
 	},
+  parameter : function(address, opbytes){
+		var tag = (address[0] == "t" ? 0 : 1);
+		var curve = (parseInt(address[2])-1);
+		var pp = (tag == 1 ? prefix.KT : prefix["tz"+(curve+1)]);
+		var bytes = utility.b58cdecode(address, pp);
+		if (tag == 1) {
+			bytes = utility.mergebuf(bytes, [0])
+		} else {					
+			bytes = utility.mergebuf([curve], bytes)
+		}
+    hex = utility.buf2hex(utility.mergebuf([tag], bytes));
+    return (opbytes.substr(-46) == hex + "00" ? false : utility.hex2buf(opbytes.substr(opbytes.indexOf(hex)+hex.length+2)));
+	},
 	operation : function(d){
 		var operations = [];
 		var revealOp = false;
@@ -771,7 +784,7 @@ trezor = {
 					case "transaction":
 						op2.amount = parseInt(op.amount);
 						op2.destination = trezor.source(op.destination);
-						if (d.opbytes.length > 172) op2.parameters = utility.hex2buf(d.opbytes.substr(172));
+            if (p = trezor.parameter(op.destination, d.opbytes)) op2.parameters = p;
 					break;
 					case "origination":
 						op2.managerPubkey = trezor.source(op.managerPubkey).hash;
