@@ -371,10 +371,12 @@ node = {
   activeProvider: defaultProvider,
   debugMode: false,
   async: true,
+	isZeronet : false,
   setDebugMode: function (t) {
     node.debugMode = t;
   },
-  setProvider: function (u) {
+  setProvider: function (u, z) {
+		if (typeof z != 'undefined') node.isZeronet = z;
     node.activeProvider = u;
   },
   resetProvider: function () {
@@ -437,17 +439,8 @@ node = {
   }
 },
 rpc = {
-  account: function (keys, amount, spendable, delegatable, delegate, fee) {
-    const operation = {
-      "kind": "origination",
-      "balance": utility.mutez(amount).toString(),
-      "fee": fee.toString(),
-      "managerPubkey": keys.pkh,
-    };
-    if (typeof spendable != "undefined") operation.spendable = spendable;
-    if (typeof delegatable != "undefined") operation.delegatable = delegatable;
-    if (typeof delegate != "undefined" && delegate) operation.delegate = delegate;
-    return rpc.sendOperation(keys.pkh, operation, keys);
+	call: function (e, d) {
+    return node.query(e, d);
   },
   getBalance: function (tz1) {
     return node.query("/chains/main/blocks/head/context/contracts/" + tz1 + "/balance").then(function (r) {
@@ -466,10 +459,8 @@ rpc = {
   getHeadHash: function () {
     return node.query("/chains/main/blocks/head/hash");
   },
-  call: function (e, d) {
-    return node.query(e, d);
-  },
-  sendOperation: function (from, operation, keys, skipPrevalidation) {
+	
+	sendOperation: function (from, operation, keys, skipPrevalidation) {
     if (typeof keys == 'undefined') keys = false;
     if (typeof skipPrevalidation == 'undefined') skipPrevalidation = false;
     var hash, counter, pred_block, sopbytes, returnedContracts, opOb;
@@ -497,9 +488,11 @@ rpc = {
       if (requiresReveal && keys && typeof f[2].key == 'undefined'){
         ops.unshift({
           kind : "reveal",
-          fee : 0,
+          fee : (node.isZeronet ? "100000" : "1150"),
           public_key : keys.pk,
           source : from,
+					gas_limit: 10000,
+					storage_limit: 0
         });
       }
       counter = parseInt(f[1]) + 1;
@@ -527,8 +520,8 @@ rpc = {
     })
     .then(function (f) {
       var opbytes = f;
-      opOb.protocol = head.protocol;
       if (keys.sk === false) {
+				opOb.protocol = head.protocol;
         return {
           opOb : opOb,
           opbytes : opbytes
@@ -542,6 +535,9 @@ rpc = {
           sopbytes = signed.sbytes;
           opOb.signature = signed.edsig;
         }
+				//return node.query('/chains/main/blocks/head/helpers/scripts/run_operation', opOb)
+				
+				opOb.protocol = head.protocol;
 				if (skipPrevalidation) return rpc.silentInject(sopbytes);
 				else return rpc.inject(opOb, sopbytes);
       }
@@ -574,9 +570,27 @@ rpc = {
       };
     });
   },
-  transfer: function (from, keys, to, amount, fee, parameter, gasLimit, storageLimit) {
-    if (typeof gasLimit == 'undefined') gasLimit = '200';
-    if (typeof storageLimit == 'undefined') storageLimit = '0';
+  
+	account: function (keys, amount, spendable, delegatable, delegate, fee, gasLimit, storageLimit) {
+		if (typeof gasLimit == 'undefined') gasLimit = '10000';
+		if (typeof storageLimit == 'undefined') storageLimit = '300';
+    const operation = {
+      "kind": "origination",
+      "balance": utility.mutez(amount).toString(),
+      "fee": fee.toString(),
+      "gas_limit": gasLimit,
+      "storage_limit": storageLimit,
+    };
+		if (node.isZeronet) operation['manager_pubkey'] = keys.pkh;
+		else operation['managerPubkey'] = keys.pkh;
+    if (typeof spendable != "undefined") operation.spendable = spendable;
+    if (typeof delegatable != "undefined") operation.delegatable = delegatable;
+    if (typeof delegate != "undefined" && delegate) operation.delegate = delegate;
+    return rpc.sendOperation(keys.pkh, operation, keys);
+  },
+	transfer: function (from, keys, to, amount, fee, parameter, gasLimit, storageLimit) {
+    if (typeof gasLimit == 'undefined') gasLimit = '10300';
+    if (typeof storageLimit == 'undefined') storageLimit = '277';
     var operation = {
       "kind": "transaction",
       "fee" : fee.toString(),
@@ -591,36 +605,29 @@ rpc = {
     }
     return rpc.sendOperation(from, operation, keys);
   },
-  activate: function (pkh, secret) {
-    var operation = {
-      "kind": "activate_account",
-      "pkh" : pkh,
-      "secret": secret,
-    };
-    return rpc.sendOperation(pkh, operation, false);
-  },
   originate: function (keys, amount, code, init, spendable, delegatable, delegate, fee, gasLimit, storageLimit) {
     if (typeof gasLimit == 'undefined') gasLimit = '10000';
-    if (typeof storageLimit == 'undefined') storageLimit = '10000';
+    if (typeof storageLimit == 'undefined') storageLimit = '300';
     var _code = utility.ml2mic(code), script = {
       code: _code,
       storage: utility.sexp2mic(init)
     }, operation = {
       "kind": "origination",
       "balance": utility.mutez(amount).toString(),
-      "managerPubkey": keys.pkh,
       "storage_limit": storageLimit,
       "gas_limit": gasLimit,
       "fee" : fee.toString(),
       "script": script,
     };
+		if (node.isZeronet) operation['manager_pubkey'] = keys.pkh;
+		else operation['managerPubkey'] = keys.pkh;
     if (typeof spendable != "undefined") operation.spendable = spendable;
     if (typeof delegatable != "undefined") operation.delegatable = delegatable;
     if (typeof delegate != "undefined" && delegate) operation.delegate = delegate;
     return rpc.sendOperation(keys.pkh, operation, keys);
   },
   setDelegate(from, keys, delegate, fee, gasLimit, storageLimit) {
-    if (typeof gasLimit == 'undefined') gasLimit = '0';
+    if (typeof gasLimit == 'undefined') gasLimit = '10000';
     if (typeof storageLimit == 'undefined') storageLimit = '0';
     var operation = {
       "kind": "delegation",
@@ -632,7 +639,7 @@ rpc = {
     return rpc.sendOperation(from, operation, keys);
   },
   registerDelegate(keys, fee, gasLimit, storageLimit) {
-    if (typeof gasLimit == 'undefined') gasLimit = '0';
+    if (typeof gasLimit == 'undefined') gasLimit = '10000';
     if (typeof storageLimit == 'undefined') storageLimit = '0';
     var operation = {
       "kind": "delegation",
@@ -643,7 +650,17 @@ rpc = {
     };
     return rpc.sendOperation(keys.pkh, operation, keys);
   },
-  typecheckCode(code) {
+  
+	activate: function (pkh, secret) {
+    var operation = {
+      "kind": "activate_account",
+      "pkh" : pkh,
+      "secret": secret,
+    };
+    return rpc.sendOperation(pkh, operation, false);
+  },
+  
+	typecheckCode(code) {
     var _code = utility.ml2mic(code);
     return node.query("/chains/main/blocks/head/helpers/scripts/typecheck_code", {program : _code, gas : "10000"});
   },
@@ -776,7 +793,8 @@ trezor = {
 						if (d.opbytes.length > 172) op2.parameters = utility.hex2buf(d.opbytes.substr(172));
 					break;
 					case "origination":
-						op2.managerPubkey = trezor.source(op.managerPubkey).hash;
+						if (node.isZeronet) op2.manager_pubkey = trezor.source(op.manager_pubkey).hash;
+						else op2.managerPubkey = trezor.source(op.managerPubkey).hash;
 						op2.balance = parseInt(op.balance);
 						op2.spendable = op.spendable;
 						op2.delegatable = op.delegatable;
