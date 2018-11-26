@@ -4,6 +4,7 @@ const BN = require("bignumber.js");
 const 
 //CLI below
 defaultProvider = "https://rpc.tezrpc.me/",
+counters = {},
 library = {
   bs58check: require('bs58check'),
   sodium: require('libsodium-wrappers'),
@@ -496,7 +497,9 @@ rpc = {
         });
       }
       counter = parseInt(f[1]) + 1;
-      
+      if (typeof counters[from] == 'undefined') counters[from] = counter;
+			if (counter > counters[from]) counters[from] = counter;
+			
       for(let i = 0; i < ops.length; i++){
         if (['proposals','ballot','transaction','origination','delegation'].indexOf(ops[i].kind) >= 0){
           if (typeof ops[i].source == 'undefined') ops[i].source = from;
@@ -504,7 +507,7 @@ rpc = {
         if (['reveal', 'transaction','origination','delegation'].indexOf(ops[i].kind) >= 0) {
           if (typeof ops[i].gas_limit == 'undefined') ops[i].gas_limit = "0";
           if (typeof ops[i].storage_limit == 'undefined') ops[i].storage_limit = "0";
-          ops[i].counter = (counter++).toString();
+          ops[i].counter = (counters[from]++).toString();
           
            ops[i].fee = ops[i].fee.toString();
            ops[i].gas_limit = ops[i].gas_limit.toString();
