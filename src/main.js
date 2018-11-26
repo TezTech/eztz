@@ -499,7 +499,8 @@ rpc = {
       counter = parseInt(f[1]) + 1;
       if (typeof counters[from] == 'undefined') counters[from] = counter;
 			if (counter > counters[from]) counters[from] = counter;
-			
+			//fix reset bug temp
+			counters[from] = counter;
       for(let i = 0; i < ops.length; i++){
         if (['proposals','ballot','transaction','origination','delegation'].indexOf(ops[i].kind) >= 0){
           if (typeof ops[i].source == 'undefined') ops[i].source = from;
