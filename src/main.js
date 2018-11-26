@@ -469,8 +469,9 @@ rpc = {
   call: function (e, d) {
     return node.query(e, d);
   },
-  sendOperation: function (from, operation, keys) {
+  sendOperation: function (from, operation, keys, skipPrevalidation) {
     if (typeof keys == 'undefined') keys = false;
+    if (typeof skipPrevalidation == 'undefined') skipPrevalidation = false;
     var hash, counter, pred_block, sopbytes, returnedContracts, opOb;
     var promises = [], requiresReveal=false;
 
@@ -541,7 +542,8 @@ rpc = {
           sopbytes = signed.sbytes;
           opOb.signature = signed.edsig;
         }
-        return rpc.inject(opOb, sopbytes);
+				if (skipPrevalidation) return rpc.silentInject(sopbytes);
+				else return rpc.inject(opOb, sopbytes);
       }
     })
   },
