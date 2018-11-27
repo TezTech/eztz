@@ -498,7 +498,7 @@ rpc = {
       if (requiresReveal && keys && typeof f[2].key == 'undefined'){
         ops.unshift({
           kind : "reveal",
-          fee : (node.isZeronet ? "100000" : "1150"),
+          fee : (node.isZeronet ? "100000" : "1269"),
           public_key : keys.pk,
           source : from,
 					gas_limit: 10000,
@@ -586,7 +586,7 @@ rpc = {
   
 	account: function (keys, amount, spendable, delegatable, delegate, fee, gasLimit, storageLimit) {
 		if (typeof gasLimit == 'undefined') gasLimit = '10000';
-		if (typeof storageLimit == 'undefined') storageLimit = '300';
+		if (typeof storageLimit == 'undefined') storageLimit = '257';
     const operation = {
       "kind": "origination",
       "balance": utility.mutez(amount).toString(),
@@ -602,8 +602,8 @@ rpc = {
     return rpc.sendOperation(keys.pkh, operation, keys);
   },
 	transfer: function (from, keys, to, amount, fee, parameter, gasLimit, storageLimit) {
-    if (typeof gasLimit == 'undefined') gasLimit = '10300';
-    if (typeof storageLimit == 'undefined') storageLimit = '277';
+    if (typeof gasLimit == 'undefined') gasLimit = '10100';
+    if (typeof storageLimit == 'undefined') storageLimit = '0';
     var operation = {
       "kind": "transaction",
       "fee" : fee.toString(),
@@ -620,7 +620,7 @@ rpc = {
   },
   originate: function (keys, amount, code, init, spendable, delegatable, delegate, fee, gasLimit, storageLimit) {
     if (typeof gasLimit == 'undefined') gasLimit = '10000';
-    if (typeof storageLimit == 'undefined') storageLimit = '300';
+    if (typeof storageLimit == 'undefined') storageLimit = '257';
     var _code = utility.ml2mic(code), script = {
       code: _code,
       storage: utility.sexp2mic(init)
