@@ -50,6 +50,15 @@ watermark = {
   generic: new Uint8Array([3]),
 },
 utility = {
+	b582int : function(v){
+		var rv = new BN(0), alpha = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+		for(var i = 0; i < v.length; i++){
+			rv = rv.plus(
+				new BN(alpha.indexOf(v[v.length-1-i])).multipliedBy(
+					new BN(alpha.length).exponentiatedBy(i)));
+		}
+		return rv.toString(16);
+	},
   totez: m => parseInt(m) / 1000000,
   mutez: function (tz) {
     return new BN(new BN(tz).toFixed(6)).multipliedBy(1000000).toString()
