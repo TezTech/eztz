@@ -12,5 +12,8 @@ const trezorTezos = require("../trezortest");
 		console.log('test');
 		trezorTezos.getAddress("44'/1729'/0'/0'").then(function(d){
 			console.log("Got keys", d);	
+			trezorTezos.getAddress("44'/1729'/0'/0'").then(function(d){
+				console.log("Got keys", d);			
+			});	
 		});
 })();
