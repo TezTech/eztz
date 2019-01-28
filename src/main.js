@@ -1329,7 +1329,7 @@ function forgeZarith(n){
   n = parseInt(n);
   while(true){
     if (n < 128){
-      if (n < 15) fn += "0";
+      if (n < 16) fn += "0";
       fn += n.toString(16);
       break;
     } else {
