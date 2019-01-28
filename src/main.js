@@ -821,8 +821,8 @@ tezos = {
             const num = new BN(input.int, 10);
             const positive_mark = num.toString(2)[0] === '-' ? '1' : '0';
             const binary = num.toString(2).replace('-', '');
-            const pad = binary.length > 6 ?  binary.length + 7 - (binary.length - 6) % 7 : 6;
-
+            const pad = binary.length <= 6 ? 6 : ((binary.length - 6) % 7 ? binary.length + 7 - (binary.length - 6) % 7 : binary.length);
+            
             const splitted = binary.padStart(pad, '0').match(/\d{6,7}/g);
             const reversed = splitted.reverse();
 
