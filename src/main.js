@@ -328,33 +328,12 @@ crypto = {
       return false;
     }
   },
-  generateKeysNoSeed: function () {
-    const kp = library.sodium.crypto_sign_keypair();
-    return {
-      sk: utility.b58cencode(kp.privateKey, prefix.edsk),
-      pk: utility.b58cencode(kp.publicKey, prefix.edpk),
-      pkh: utility.b58cencode(library.sodium.crypto_generichash(20, kp.publicKey), prefix.tz1),
-    };
-  },
   generateKeys: function (m, p) {
     const s = library.bip39.mnemonicToSeed(m, p).slice(0, 32);
     const kp = library.sodium.crypto_sign_seed_keypair(s);
     return {
       mnemonic: m,
       passphrase: p,
-      sk: utility.b58cencode(kp.privateKey, prefix.edsk),
-      pk: utility.b58cencode(kp.publicKey, prefix.edpk),
-      pkh: utility.b58cencode(library.sodium.crypto_generichash(20, kp.publicKey), prefix.tz1),
-    };
-  },
-  generateKeysFromSeedMulti: function (m, p, n) {
-    n /= (256 ^ 2);
-    const s = library.bip39.mnemonicToSeed(m, library.pbkdf2.pbkdf2Sync(p, n.toString(36).slice(2), 0, 32, 'sha512').toString()).slice(0, 32);
-    const kp = library.sodium.crypto_sign_seed_keypair(s);
-    return {
-      mnemonic: m,
-      passphrase: p,
-      n: n,
       sk: utility.b58cencode(kp.privateKey, prefix.edsk),
       pk: utility.b58cencode(kp.publicKey, prefix.edpk),
       pkh: utility.b58cencode(library.sodium.crypto_generichash(20, kp.publicKey), prefix.tz1),
@@ -407,11 +386,12 @@ node = {
         const http = new XMLHttpRequest();
         http.open(t, node.activeProvider + e, node.async);
         if (node.debugMode)
-          console.log(e, o, http.responseText);
+          console.log("Node call", e, o);
         http.onload = function () {
           if (http.status === 200) {
             if (http.responseText) {
               let r = JSON.parse(http.responseText);
+							if (node.debugMode) console.log("Node response", e, o, r);
               if (typeof r.error !== 'undefined') {
                 reject(r.error);
               } else {
@@ -452,47 +432,108 @@ rpc = {
 	call: function (e, d) {
     return node.query(e, d);
   },
-  getBalance: function (tz1) {
-    return node.query("/chains/main/blocks/head/context/contracts/" + tz1 + "/balance").then(function (r) {
+  getBalance: function (a) {
+    return node.query("/chains/main/blocks/head/context/contracts/" + a + "/balance").then(function (r) {
       return r;
     });
   },
-  getDelegate: function (tz1) {
-    return node.query("/chains/main/blocks/head/context/contracts/" + tz1 + "/delegate").then(function(r){
+  getDelegate: function (a) {
+    return node.query("/chains/main/blocks/head/context/contracts/" + a + "/delegate").then(function(r){
       if (r) return r;
       return false;
     }).catch(function(){return false});
   },
-  getHead: function () {
+  getManager : function(a){
+		 return node.query("/chains/main/blocks/head/context/contracts/" + a + "/manager_key");
+	},
+	getCounter : function(a){
+		 return node.query("/chains/main/blocks/head/context/contracts/" + a + "/counter");
+	},
+	getBaker : function(tz1){
+		 return node.query("/chains/main/blocks/head/context/delegates/" + tz1);
+	},
+	getHead: function () {
     return node.query("/chains/main/blocks/head");
+  },
+	getHeader: function () {
+    return node.query("/chains/main/blocks/head/header");
   },
   getHeadHash: function () {
     return node.query("/chains/main/blocks/head/hash");
   },
 	
-	sendOperation: function (from, operation, keys, skipPrevalidation) {
-    if (typeof keys == 'undefined') keys = false;
-    if (typeof skipPrevalidation == 'undefined') skipPrevalidation = false;
+	getBallotList: function(){
+		return node.query("/chains/main/blocks/head/votes/ballot_list");
+	},
+	getProposals: function(){
+		return node.query("/chains/main/blocks/head/votes/proposals ");
+	},
+	getBallots: function(){
+		return node.query("/chains/main/blocks/head/votes/ballots ");
+	},
+	getListings: function(){
+		return node.query("/chains/main/blocks/head/votes/listings ");
+	},
+	getCurrentProposal: function(){
+		return node.query("/chains/main/blocks/head/votes/current_proposal ");
+	},
+	getCurrentPeriod: function(){
+		return node.query("/chains/main/blocks/head/votes/current_period_kind ");
+	},
+	getCurrentQuorum: function(){
+		return node.query("/chains/main/blocks/head/votes/current_quorum ");
+	},
+	
+	awaitOperation : function(hash, interval, timeout){
+		if (typeof interval == 'undefined') '30';
+		if (typeof timeout == 'undefined') '180';
+		if (timeout <= 0) throw "Timeout must be more than 0";
+		if (interval <= 0) throw "Interval must be more than 0";
+		var at = Math.ceil(timeout/interval) + 1, c = 0;;
+		return new Promise(function(resolve, reject){
+			var repeater = function(){
+				rpc.getHead().then(function(h){
+					c++;
+					outer:
+					for(var i = 3, found = false; i >= 0; i--){
+						for(var j = 0; j < h.operations[i].length; j++){
+							if (h.operations[i][j].hash == hash){
+								found = true;
+								break outer;
+							}
+						}
+					}
+					if (found) resolve(h.hash)
+					else {
+						if (c >= at) {
+							reject("Timeout");
+						} else {
+							setTimeout(repeater, interval);
+						}
+					}
+				});
+			}
+			repeater();
+		});
+	},
+	prepareOperation : function(from, operation, keys){
+		if (typeof keys == 'undefined') keys = false;
     var hash, counter, pred_block, sopbytes, returnedContracts, opOb;
     var promises = [], requiresReveal=false;
-
     promises.push(node.query('/chains/main/blocks/head/header'));
-
     if (Array.isArray(operation)) {
       ops = operation;
     } else {
       ops = [operation];
     }
-   
     for(let i = 0; i < ops.length; i++){
       if (['transaction','origination','delegation'].indexOf(ops[i].kind) >= 0){
         requiresReveal = true;
-        promises.push(node.query('/chains/main/blocks/head/context/contracts/' + from + '/counter'));
-        promises.push(node.query('/chains/main/blocks/head/context/contracts/' + from + '/manager_key'));
+        promises.push(rpc.getCounter(from));
+        promises.push(rpc.getManager(from));
         break;
       }
     }
-
     return Promise.all(promises).then(function (f) {
       head = f[0];
       if (requiresReveal && keys && typeof f[2].key == 'undefined'){
@@ -531,28 +572,29 @@ rpc = {
       }
       return tezos.forge(head, opOb);
     })
-    .then(function (f) {
-      var opbytes = f;
+	},
+	simulateOperation : function(from, operation, keys){
+		return rpc.prepareOperation(from, operation, keys).then(function(fullOp){
+			return node.query('/chains/main/blocks/head/helpers/scripts/run_operation', fullOp.opOb) 
+		});
+	},
+	sendOperation: function (from, operation, keys, skipPrevalidation) {
+    if (typeof skipPrevalidation == 'undefined') skipPrevalidation = false;
+    return rpc.prepareOperation(from, operation, keys).then(function (fullOp) {
       if (keys.sk === false) {
-				opOb.protocol = head.protocol;
-        return {
-          opOb : opOb,
-          opbytes : opbytes
-        };
+        return fullOp;
       } else {
         if (!keys) {
-          sopbytes = opbytes + "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
-          opOb.signature = "edsigtXomBKi5CTRf5cjATJWSyaRvhfYNHqSUGrn4SdbYRcGwQrUGjzEfQDTuqHhuA8b2d8NarZjz8TRf65WkpQmo423BtomS8Q";
+          fullOp.opbytes += "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
+          fullOp.opOb.signature = "edsigtXomBKi5CTRf5cjATJWSyaRvhfYNHqSUGrn4SdbYRcGwQrUGjzEfQDTuqHhuA8b2d8NarZjz8TRf65WkpQmo423BtomS8Q";
         } else {
-          var signed = crypto.sign(opbytes, keys.sk, watermark.generic);
-          sopbytes = signed.sbytes;
-          opOb.signature = signed.edsig;
+          var signed = crypto.sign(fullOp.opbytes, keys.sk, watermark.generic);
+          fullOp.opbytes = signed.sbytes;
+          fullOp.opOb.signature = signed.edsig;
         }
-				//return node.query('/chains/main/blocks/head/helpers/scripts/run_operation', opOb)
-				
-				opOb.protocol = head.protocol;
-				if (skipPrevalidation) return rpc.silentInject(sopbytes);
-				else return rpc.inject(opOb, sopbytes);
+				console.log(fullOp);
+				if (skipPrevalidation) return rpc.silentInject(fullOp.opbytes);
+				else return rpc.inject(fullOp.opOb, fullOp.opbytes);
       }
     })
   },
@@ -760,8 +802,10 @@ contract = {
   },
 };
 tezos = {
-  forge : function(head, opOb){
-    //Temp - validate forge locally
+  forge : function(head, opOb, validateLocalForge){
+    if (typeof validateLocalForge == 'undefined') validateLocalForge = true;
+		
+		
     return node.query('/chains/'+head.chain_id+'/blocks/'+head.hash+'/helpers/forge/operations', opOb).then(function(remoteForgedBytes){
       var localForgedBytes;
       localForgedBytes = utility.buf2hex(utility.b58cdecode(opOb.branch, prefix.b));
@@ -769,14 +813,11 @@ tezos = {
         localForgedBytes += forgeOp(opOb.contents[i]);
       }
       
-      //Debug
-      console.log('FORGE VALIDATION TEST START');
-      console.log(opOb)
-      console.log(remoteForgedBytes)
-      console.log(localForgedBytes)
-      console.log('FORGE VALIDATION TEST END');
-      
-      if (localForgedBytes == remoteForgedBytes) return remoteForgedBytes;
+      opOb.protocol = head.protocol;
+      if (localForgedBytes == remoteForgedBytes) return {
+				opbytes : localForgedBytes,
+				opOb : opOb
+			};
       else throw "Forge validatione error - local and remote bytes don't match";
     });
   },
@@ -1380,7 +1421,6 @@ utility.tzjson2arr = utility.mic2arr;
 utility.mlraw2json = utility.ml2mic;
 utility.mintotz = utility.totez;
 utility.tztomin = utility.mutez;
-prefix.TZ = new Uint8Array([2,90,121]);
 
 //Expose library
 eztz = {
