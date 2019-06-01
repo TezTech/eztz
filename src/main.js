@@ -636,8 +636,7 @@ rpc = {
       "gas_limit": gasLimit,
       "storage_limit": storageLimit,
     };
-		if (node.isZeronet) operation['manager_pubkey'] = keys.pkh;
-		else operation['managerPubkey'] = keys.pkh;
+		operation['manager_pubkey'] = keys.pkh;
     if (typeof spendable != "undefined") operation.spendable = spendable;
     if (typeof delegatable != "undefined") operation.delegatable = delegatable;
     if (typeof delegate != "undefined" && delegate) operation.delegate = delegate;
@@ -674,8 +673,7 @@ rpc = {
       "fee" : fee.toString(),
       "script": script,
     };
-		if (node.isZeronet) operation['manager_pubkey'] = keys.pkh;
-		else operation['managerPubkey'] = keys.pkh;
+		operation['manager_pubkey'] = keys.pkh;
     if (typeof spendable != "undefined") operation.spendable = spendable;
     if (typeof delegatable != "undefined") operation.delegatable = delegatable;
     if (typeof delegate != "undefined" && delegate) operation.delegate = delegate;
@@ -1068,8 +1066,7 @@ trezor = {
             if (p = trezor.parameter(op.destination, d.opbytes)) op2.parameters = p;
 					break;
 					case "origination":
-						if (node.isZeronet) op2.manager_pubkey = trezor.source(op.manager_pubkey).hash;
-						else op2.managerPubkey = trezor.source(op.managerPubkey).hash;
+						op2.manager_pubkey = trezor.source(op.manager_pubkey).hash;
 						op2.balance = parseInt(op.balance);
 						op2.spendable = op.spendable;
 						op2.delegatable = op.delegatable;
@@ -1313,7 +1310,7 @@ function forgeOp(op){
           fop += forgeBool(false);
         }
       } else if (forgeOpTags[op.kind] == 9) {
-        fop += forgePublicKeyHash(op.managerPubkey);
+        fop += forgePublicKeyHash(op.manager_pubkey);
         fop += forgeZarith(op.balance);
         fop += forgeBool(op.spendable);
         fop += forgeBool(op.delegatable);
