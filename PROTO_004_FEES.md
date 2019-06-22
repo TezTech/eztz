@@ -47,3 +47,4 @@
 - opbytes increase when sending a larger amount of XTZ - e.g. 1Mtz will cost ~4mutez more than sending 1tz
 - An inactive implicit account is a tz account with nil (0) balance which isn't registered as a delegate/baker
 - A buffer of 100 gas and 100mutez is recommended
+- Recommended settings for transactions should be fee of 1420mutez, storage limit of 300, and gas limit of 10600 (to cover a variety of cases)
