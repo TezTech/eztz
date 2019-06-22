@@ -516,8 +516,9 @@ rpc = {
 			repeater();
 		});
 	},
-	prepareOperation : function(from, operation, keys){
+	prepareOperation : function(from, operation, keys, revealFee){
 		if (typeof keys == 'undefined') keys = false;
+		if (typeof revealFee == 'undefined') revealFee = "1269";
     var hash, counter, pred_block, sopbytes, returnedContracts, opOb;
     var promises = [], requiresReveal=false;
     promises.push(node.query('/chains/main/blocks/head/header'));
@@ -539,7 +540,7 @@ rpc = {
       if (requiresReveal && keys && typeof f[2].key == 'undefined'){
         ops.unshift({
           kind : "reveal",
-          fee : (node.isZeronet ? "100000" : "1269"),
+          fee : revealFee,
           public_key : keys.pk,
           source : from,
 					gas_limit: 10000,
@@ -578,9 +579,10 @@ rpc = {
 			return node.query('/chains/main/blocks/head/helpers/scripts/run_operation', fullOp.opOb) 
 		});
 	},
-	sendOperation: function (from, operation, keys, skipPrevalidation) {
+	sendOperation: function (from, operation, keys, skipPrevalidation, revealFee) {
+    if (typeof revealFee == 'undefined') revealFee = '1269';
     if (typeof skipPrevalidation == 'undefined') skipPrevalidation = false;
-    return rpc.prepareOperation(from, operation, keys).then(function (fullOp) {
+    return rpc.prepareOperation(from, operation, keys, revealFee).then(function (fullOp) {
       if (keys.sk === false) {
         return fullOp;
       } else {
@@ -642,9 +644,10 @@ rpc = {
     if (typeof delegate != "undefined" && delegate) operation.delegate = delegate;
     return rpc.sendOperation(keys.pkh, operation, keys);
   },
-	transfer: function (from, keys, to, amount, fee, parameter, gasLimit, storageLimit) {
-    if (typeof gasLimit == 'undefined') gasLimit = '10100';
-    if (typeof storageLimit == 'undefined') storageLimit = '0';
+	transfer: function (from, keys, to, amount, fee, parameter, gasLimit, storageLimit, revealFee) {
+    if (typeof revealFee == 'undefined') revealFee = '1269';
+    if (typeof gasLimit == 'undefined') gasLimit = '10200';
+    if (typeof storageLimit == 'undefined') storageLimit = '300';
     var operation = {
       "kind": "transaction",
       "fee" : fee.toString(),
@@ -657,7 +660,7 @@ rpc = {
     if (parameter){
       operation.parameters = eztz.utility.sexp2mic(parameter);
     }
-    return rpc.sendOperation(from, operation, keys);
+    return rpc.sendOperation(from, operation, keys, false, revealFee);
   },
   originate: function (keys, amount, code, init, spendable, delegatable, delegate, fee, gasLimit, storageLimit) {
     if (typeof gasLimit == 'undefined') gasLimit = '10000';
