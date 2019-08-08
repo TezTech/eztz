@@ -1,9 +1,10 @@
 if (typeof Buffer == "undefined") Buffer = require("buffer/").Buffer;
 if (typeof XMLHttpRequest == "undefined") XMLHttpRequest = require('xhr2');
 const BN = require("bignumber.js");
-const 
 //CLI below
 defaultProvider = "https://mainnet.tezrpc.me/",
+//Pocket
+pocketOpts = {},
 counters = {},
 library = {
   bs58check: require('bs58check'),
@@ -121,8 +122,7 @@ utility = {
           if (val === parseInt(val).toString()) {
             if (!ret.prim) return {"int": val};
             else ret.args.push({"int": val});
-          } else if (val[0] == '0' && val[1] == 'x') {
-						val = val.substr(2);
+          } else if (val[0] == '0') {
             if (!ret.prim) return {"bytes": val};
             else ret.args.push({"bytes": val});
           } else if (ret.prim) {
@@ -426,6 +426,390 @@ node = {
           http.send();
         }
       } catch(e) { reject(e)}
+    });
+  }
+},
+// Pocket Node
+setPocketOpts = function (devID = "", netID = "MAINNET", maxNodes = 5, timeOut = 10000, sslOnly = true) {
+  pocketOpts = {
+    devID: devID,
+    networkName: "TEZOS",
+    netIDs: [netID],
+    maxNodes: maxNodes,
+    requestTimeOut: timeOut,
+    sslOnly: sslOnly
+  }
+},
+pocket_node = {
+  debugMode: false,
+  async: true,
+	isZeronet : false,
+  setDebugMode: function (t) {
+    node.debugMode = t;
+  },
+  query: function (e, o, t) {
+    if (typeof o === 'undefined') {
+      if (typeof t === 'undefined') {
+        t = "GET";
+      } else 
+        o = {};
+    } else {
+      if (typeof t === 'undefined')
+        t = 'POST';
+    }
+    return new Promise(function (resolve, reject) {
+      try {
+        const Pocket = require('pocket-js-core').Pocket;
+        const pocket = new Pocket(pocketOpts);
+        // Properties for the relay class
+        var httpMethod = t;
+        var path = e;
+        var headers = null;
+        // Handle headers          
+        if (t == 'POST'){
+          headers = {"Content-Type": "application/json"}       
+        }
+        // Create a relay
+        var relay = pocket.createRelay(pocket.configuration.blockchains[0].name, pocket.configuration.blockchains[0].netID, null, httpMethod, path, null, headers);
+        // Send relay
+        pocket.sendRelay(relay, function(error, response){
+
+          if (error) {
+            reject(error);
+          } 
+          let r = JSON.parse(response);
+          if (typeof r.error !== 'undefined') {
+            reject(r.error);
+          } else if (response) {
+            if (typeof r.ok !== 'undefined') r = r.ok;
+            resolve(r);
+          } else {
+            reject("Empty response returned");
+          }
+        });
+      } catch(e) { 
+        reject(e)
+      }
+    });
+  }
+},
+pocket_rpc = {
+	call: function (e, d) {
+    return pocket_node.query(e, d);
+  },
+  getBalance: function (a) {
+    return pocket_node.query("/chains/main/blocks/head/context/contracts/" + a + "/balance").then(function (r) {
+      return r;
+    });
+  },
+  getDelegate: function (a) {
+    return pocket_node.query("/chains/main/blocks/head/context/contracts/" + a + "/delegate").then(function(r){
+      if (r) return r;
+      return false;
+    }).catch(function(){return false});
+  },
+  getManager : function(a){
+		 return pocket_node.query("/chains/main/blocks/head/context/contracts/" + a + "/manager_key");
+	},
+	getCounter : function(a){
+		 return pocket_node.query("/chains/main/blocks/head/context/contracts/" + a + "/counter");
+	},
+	getBaker : function(tz1){
+		 return pocket_node.query("/chains/main/blocks/head/context/delegates/" + tz1);
+	},
+	getHead: function () {
+    return pocket_node.query("/chains/main/blocks/head");
+  },
+	getHeader: function () {
+    return pocket_node.query("/chains/main/blocks/head/header");
+  },
+  getHeadHash: function () {
+    return pocket_node.query("/chains/main/blocks/head/hash");
+  },
+	
+	getBallotList: function(){
+		return pocket_node.query("/chains/main/blocks/head/votes/ballot_list");
+	},
+	getProposals: function(){
+		return pocket_node.query("/chains/main/blocks/head/votes/proposals ");
+	},
+	getBallots: function(){
+		return pocket_node.query("/chains/main/blocks/head/votes/ballots ");
+	},
+	getListings: function(){
+		return pocket_node.query("/chains/main/blocks/head/votes/listings ");
+	},
+	getCurrentProposal: function(){
+		return pocket_node.query("/chains/main/blocks/head/votes/current_proposal ");
+	},
+	getCurrentPeriod: function(){
+		return pocket_node.query("/chains/main/blocks/head/votes/current_period_kind ");
+	},
+	getCurrentQuorum: function(){
+		return pocket_node.query("/chains/main/blocks/head/votes/current_quorum ");
+	},
+	
+	awaitOperation : function(hash, interval, timeout){
+		if (typeof interval == 'undefined') '30';
+		if (typeof timeout == 'undefined') '180';
+		if (timeout <= 0) throw "Timeout must be more than 0";
+		if (interval <= 0) throw "Interval must be more than 0";
+		var at = Math.ceil(timeout/interval) + 1, c = 0;;
+		return new Promise(function(resolve, reject){
+			var repeater = function(){
+				rpc.getHead().then(function(h){
+					c++;
+					outer:
+					for(var i = 3, found = false; i >= 0; i--){
+						for(var j = 0; j < h.operations[i].length; j++){
+							if (h.operations[i][j].hash == hash){
+								found = true;
+								break outer;
+							}
+						}
+					}
+					if (found) resolve(h.hash)
+					else {
+						if (c >= at) {
+							reject("Timeout");
+						} else {
+							setTimeout(repeater, interval);
+						}
+					}
+				});
+			}
+			repeater();
+		});
+	},
+	prepareOperation : function(from, operation, keys, revealFee){
+		if (typeof keys == 'undefined') keys = false;
+		if (typeof revealFee == 'undefined') revealFee = "1269";
+    var hash, counter, pred_block, sopbytes, returnedContracts, opOb;
+    var promises = [], requiresReveal=false;
+    promises.push(pocket_node.query('/chains/main/blocks/head/header'));
+    if (Array.isArray(operation)) {
+      ops = operation;
+    } else {
+      ops = [operation];
+    }
+    for(let i = 0; i < ops.length; i++){
+      if (['transaction','origination','delegation'].indexOf(ops[i].kind) >= 0){
+        requiresReveal = true;
+        promises.push(rpc.getCounter(from));
+        promises.push(rpc.getManager(from));
+        break;
+      }
+    }
+    return Promise.all(promises).then(function (f) {
+      head = f[0];
+      if (requiresReveal && keys && typeof f[2].key == 'undefined'){
+        ops.unshift({
+          kind : "reveal",
+          fee : revealFee,
+          public_key : keys.pk,
+          source : from,
+					gas_limit: 10000,
+					storage_limit: 0
+        });
+      }
+      counter = parseInt(f[1]) + 1;
+      if (typeof counters[from] == 'undefined') counters[from] = counter;
+			if (counter > counters[from]) counters[from] = counter;
+			//fix reset bug temp
+			counters[from] = counter;
+      for(let i = 0; i < ops.length; i++){
+        if (['proposals','ballot','transaction','origination','delegation'].indexOf(ops[i].kind) >= 0){
+          if (typeof ops[i].source == 'undefined') ops[i].source = from;
+        }
+        if (['reveal', 'transaction','origination','delegation'].indexOf(ops[i].kind) >= 0) {
+          if (typeof ops[i].gas_limit == 'undefined') ops[i].gas_limit = "0";
+          if (typeof ops[i].storage_limit == 'undefined') ops[i].storage_limit = "0";
+          ops[i].counter = (counters[from]++).toString();
+          
+           ops[i].fee = ops[i].fee.toString();
+           ops[i].gas_limit = ops[i].gas_limit.toString();
+           ops[i].storage_limit = ops[i].storage_limit.toString();
+           ops[i].counter = ops[i].counter.toString();
+        }
+      }
+      opOb = {
+        "branch": head.hash,
+        "contents": ops
+      }
+      return tezos.forge(head, opOb);
+    })
+	},
+	simulateOperation : function(from, operation, keys){
+		return rpc.prepareOperation(from, operation, keys).then(function(fullOp){
+			return pocket_node.query('/chains/main/blocks/head/helpers/scripts/run_operation', fullOp.opOb) 
+		});
+	},
+	sendOperation: function (from, operation, keys, skipPrevalidation, revealFee) {
+    if (typeof revealFee == 'undefined') revealFee = '1269';
+    if (typeof skipPrevalidation == 'undefined') skipPrevalidation = false;
+    return rpc.prepareOperation(from, operation, keys, revealFee).then(function (fullOp) {
+      if (keys.sk === false) {
+        return fullOp;
+      } else {
+        if (!keys) {
+          fullOp.opbytes += "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
+          fullOp.opOb.signature = "edsigtXomBKi5CTRf5cjATJWSyaRvhfYNHqSUGrn4SdbYRcGwQrUGjzEfQDTuqHhuA8b2d8NarZjz8TRf65WkpQmo423BtomS8Q";
+        } else {
+          var signed = crypto.sign(fullOp.opbytes, keys.sk, watermark.generic);
+          fullOp.opbytes = signed.sbytes;
+          fullOp.opOb.signature = signed.edsig;
+        }
+				console.log(fullOp);
+				if (skipPrevalidation) return rpc.silentInject(fullOp.opbytes);
+				else return rpc.inject(fullOp.opOb, fullOp.opbytes);
+      }
+    })
+  },
+  inject: function(opOb, sopbytes){
+    var opResponse = [], errors = [];
+    return pocket_node.query('/chains/main/blocks/head/helpers/preapply/operations', [opOb]).then(function (f) {
+      if (!Array.isArray(f)) throw {error: "RPC Fail", errors:[]};
+      for(var i = 0; i < f.length; i++){
+        for(var j = 0; j < f[i].contents.length; j++){
+          opResponse.push(f[i].contents[j]);
+          if (typeof f[i].contents[j].metadata.operation_result != 'undefined' && f[i].contents[j].metadata.operation_result.status == "failed")
+            errors = errors.concat(f[i].contents[j].metadata.operation_result.errors);
+        }
+      }        
+      if (errors.length) throw {error: "Operation Failed", errors:errors};
+      return pocket_node.query('/injection/operation', sopbytes);
+    }).then(function (f) {
+      return {
+        hash : f,
+        operations : opResponse
+      };
+    });
+  },
+	silentInject: function(sopbytes){
+    return pocket_node.query('/injection/operation', sopbytes).then(function (f) {
+      return {
+        hash : f
+      };
+    });
+  },
+  
+	account: function (keys, amount, spendable, delegatable, delegate, fee, gasLimit, storageLimit) {
+		if (typeof gasLimit == 'undefined') gasLimit = '10000';
+		if (typeof storageLimit == 'undefined') storageLimit = '257';
+    const operation = {
+      "kind": "origination",
+      "balance": utility.mutez(amount).toString(),
+      "fee": fee.toString(),
+      "gas_limit": gasLimit,
+      "storage_limit": storageLimit,
+    };
+		operation['manager_pubkey'] = keys.pkh;
+    if (typeof spendable != "undefined") operation.spendable = spendable;
+    if (typeof delegatable != "undefined") operation.delegatable = delegatable;
+    if (typeof delegate != "undefined" && delegate) operation.delegate = delegate;
+    return rpc.sendOperation(keys.pkh, operation, keys);
+  },
+	transfer: function (from, keys, to, amount, fee, parameter, gasLimit, storageLimit, revealFee) {
+    if (typeof revealFee == 'undefined') revealFee = '1269';
+    if (typeof gasLimit == 'undefined') gasLimit = '10200';
+    if (typeof storageLimit == 'undefined') storageLimit = '300';
+    var operation = {
+      "kind": "transaction",
+      "fee" : fee.toString(),
+      "gas_limit": gasLimit,
+      "storage_limit": storageLimit,
+      "amount": utility.mutez(amount).toString(),
+      "destination": to
+    };
+    if (typeof parameter == 'undefined') parameter = false;
+    if (parameter){
+      operation.parameters = eztz.utility.sexp2mic(parameter);
+    }
+    return rpc.sendOperation(from, operation, keys, false, revealFee);
+  },
+  originate: function (keys, amount, code, init, spendable, delegatable, delegate, fee, gasLimit, storageLimit) {
+    if (typeof gasLimit == 'undefined') gasLimit = '10000';
+    if (typeof storageLimit == 'undefined') storageLimit = '257';
+    var _code = utility.ml2mic(code), script = {
+      code: _code,
+      storage: utility.sexp2mic(init)
+    }, operation = {
+      "kind": "origination",
+      "balance": utility.mutez(amount).toString(),
+      "storage_limit": storageLimit,
+      "gas_limit": gasLimit,
+      "fee" : fee.toString(),
+      "script": script,
+    };
+		operation['manager_pubkey'] = keys.pkh;
+    if (typeof spendable != "undefined") operation.spendable = spendable;
+    if (typeof delegatable != "undefined") operation.delegatable = delegatable;
+    if (typeof delegate != "undefined" && delegate) operation.delegate = delegate;
+    return rpc.sendOperation(keys.pkh, operation, keys);
+  },
+  setDelegate(from, keys, delegate, fee, gasLimit, storageLimit) {
+    if (typeof gasLimit == 'undefined') gasLimit = '10000';
+    if (typeof storageLimit == 'undefined') storageLimit = '0';
+    var operation = {
+      "kind": "delegation",
+      "fee" : fee.toString(),
+      "gas_limit": gasLimit,
+      "storage_limit": storageLimit,
+    };
+    if (typeof delegate != "undefined" && delegate) {
+      operation.delegate = delegate;
+    }
+    return rpc.sendOperation(from, operation, keys);
+  },
+  registerDelegate(keys, fee, gasLimit, storageLimit) {
+    if (typeof gasLimit == 'undefined') gasLimit = '10000';
+    if (typeof storageLimit == 'undefined') storageLimit = '0';
+    var operation = {
+      "kind": "delegation",
+      "fee" : fee.toString(),
+      "gas_limit": gasLimit,
+      "storage_limit": storageLimit,
+      "delegate": keys.pkh,
+    };
+    return rpc.sendOperation(keys.pkh, operation, keys);
+  },
+  
+	activate: function (pkh, secret) {
+    var operation = {
+      "kind": "activate_account",
+      "pkh" : pkh,
+      "secret": secret,
+    };
+    return rpc.sendOperation(pkh, operation, false);
+  },
+  
+	typecheckCode(code) {
+    var _code = utility.ml2mic(code);
+    return pocket_node.query("/chains/main/blocks/head/helpers/scripts/typecheck_code", {program : _code, gas : "10000"});
+  },
+  packData(data, type) {
+    var check = {
+      data: utility.sexp2mic(data),
+      type: utility.sexp2mic(type),
+      gas:"400000"
+    };
+    return pocket_node.query("/chains/main/blocks/head/helpers/scripts/pack_data", check);
+  },
+  typecheckData(data, type) {
+    var check = {
+      data: utility.sexp2mic(data),
+      type: utility.sexp2mic(type),
+      gas:"400000"
+    };
+    return pocket_node.query("/chains/main/blocks/head/helpers/scripts/typecheck_data", check);
+  },
+  runCode(code, amount, input, storage, trace) {
+    var ep = ((typeof trace != 'undefined' && trace) ? 'trace_code' : 'run_code');
+    return pocket_node.query("/chains/main/blocks/head/helpers/scripts/" + ep, {
+      script: utility.ml2mic(code),
+      amount: utility.mutez(amount).toString(),
+      input: utility.sexp2mic(input),
+      storage: utility.sexp2mic(storage),
     });
   }
 },
@@ -1437,7 +1821,23 @@ eztz = {
   tezos : tezos
 };
 
+//Expose library
+eztz_pocket = {
+  library: library,
+  prefix: prefix,
+  watermark: watermark,
+  utility: utility,
+  crypto: crypto,
+  node: pocket_node,
+  rpc: pocket_rpc,
+  contract: contract,
+  trezor: trezor,
+  tezos : tezos
+};
+
 module.exports = {
   defaultProvider,
   eztz: eztz,
+  eztz_pocket: eztz_pocket,
+  setPocketOpts: setPocketOpts,
 };
