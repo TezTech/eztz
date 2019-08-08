@@ -253,6 +253,15 @@ describe('main', () => {
 
         return expect(p).rejects.toEqual('err');
       });
+
+      test('getBalance using Pocket Network', async () => {
+        // Set Pocket options (DeveloperID, NetID, MaxNodes, timeOut, sslOnly)
+        main.setPocketOpts("", "MAINNET", null, null, null)
+
+        var res = await eztz_pocket.rpc.getBalance("tz1LSAycAVcNdYnXCy18bwVksXci8gUC2YpA");
+
+        expect(res).resolves.toEqual("0");
+      });
     })
   });
 });
