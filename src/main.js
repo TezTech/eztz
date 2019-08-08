@@ -121,7 +121,8 @@ utility = {
           if (val === parseInt(val).toString()) {
             if (!ret.prim) return {"int": val};
             else ret.args.push({"int": val});
-          } else if (val[0] == '0') {
+          } else if (val[0] == '0' && val[1] == 'x') {
+						val = val.substr(2);
             if (!ret.prim) return {"bytes": val};
             else ret.args.push({"bytes": val});
           } else if (ret.prim) {
