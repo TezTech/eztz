@@ -258,9 +258,11 @@ describe('main', () => {
         // Set Pocket options (DeveloperID, NetID, MaxNodes, timeOut, sslOnly)
         main.setPocketOpts("", "MAINNET", null, null, null)
 
-        var res = await eztz_pocket.rpc.getBalance("tz1LSAycAVcNdYnXCy18bwVksXci8gUC2YpA");
-
-        expect(res).resolves.toEqual("0");
+        eztz_pocket.rpc.getBalance("tz1LSAycAVcNdYnXCy18bwVksXci8gUC2YpA").then(function(res) {
+          expect(res).resolves.toEqual("0");
+        }, function(err) {
+          expect(err).resolves.toEqual("0");
+        });
       });
     })
   });
