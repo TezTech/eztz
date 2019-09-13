@@ -1,24 +1,24 @@
 {
   "name": "eztz.js",
   "version": "0.0.1",
+  "scripts": {
+    "build": "webpack",
+    "coverage": "jest --coverage && codecov",
+    "test": "jest"
+  },
   "dependencies": {
     "bignumber.js": "^7.2.1",
     "bip39": "^2.5.0",
     "bs58check": "^2.1.1",
     "buffer": "^5.1.0",
-    "codecov": "^2.3.1",
     "libsodium-wrappers": "^0.5.4",
     "pbkdf2": "^3.0.14",
     "xhr2": "^0.1.4",
     "xmlhttprequest": "^1.8.0"
   },
-  "scripts": {
-    "test": "jest",
-    "coverage": "jest --coverage && codecov",
-    "build": "webpack"
-  },
   "devDependencies": {
     "browserify": "^14.4.0",
+    "codecov": "^2.3.1",
     "jest": "^21.2.1",
     "uglifyjs-webpack-plugin": "^1.2.4",
     "webpack": "^3.11.0"
