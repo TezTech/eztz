@@ -3,6 +3,7 @@ if (typeof XMLHttpRequest == "undefined") XMLHttpRequest = require('xhr2');
 const BN = require("bignumber.js");
 const 
 //CLI below
+defaultProtocol = "PsBabyM1eUXZseaJdmXFApDSBqj8YBfwELoxZHHW77EMcAbbwAS",
 defaultProvider = "https://mainnet.tezrpc.me/",
 counters = {},
 library = {
@@ -272,7 +273,6 @@ crypto = {
     const esm = esb.slice(8);
     
     return window.crypto.subtle.importKey('raw', new TextEncoder('utf-8').encode(password), {name: 'PBKDF2'}, false, ['deriveBits']).then(function(key){
-        console.log(key);
       return window.crypto.subtle.deriveBits(
         {
           name: 'PBKDF2',
@@ -284,8 +284,6 @@ crypto = {
         256 
       );
     }).then(function(key){
-        console.log(key);
-        console.log(library.sodium.crypto_secretbox_open_easy(esm, new Uint8Array(24), new Uint8Array(key)));
       const kp = library.sodium.crypto_sign_seed_keypair(library.sodium.crypto_secretbox_open_easy(esm, new Uint8Array(24), new Uint8Array(key)));
       return {
         sk: utility.b58cencode(kp.privateKey, prefix.edsk),
@@ -372,6 +370,12 @@ node = {
   resetProvider: function () {
     node.activeProvider = defaultProvider;
   },
+  setProtocol : function(p){
+    node.currentProtocol = p;
+  },
+  resetProtocol: function () {
+    node.currentProtocol = defaultProtocol;
+  },
   query: function (e, o, t) {
     if (typeof o === 'undefined') {
       if (typeof t === 'undefined') {
@@ -391,12 +395,17 @@ node = {
         http.onload = function () {
           if (http.status === 200) {
             if (http.responseText) {
-              let r = JSON.parse(http.responseText);
+              let r;
+              if (http.responseText.trim() == "null") {
+                r = false;
+              } else {
+                r = JSON.parse(http.responseText);
+              }
 							if (node.debugMode) console.log("Node response", e, o, r);
-              if (typeof r.error !== 'undefined') {
+              if (r && typeof r.error !== 'undefined') {
                 reject(r.error);
               } else {
-                if (typeof r.ok !== 'undefined') r = r.ok;
+                if (r && typeof r.ok !== 'undefined') r = r.ok;
                 resolve(r);
               }
             } else {
@@ -538,14 +547,14 @@ rpc = {
     }
     return Promise.all(promises).then(function (f) {
       head = f[0];
-      if (requiresReveal && keys && typeof f[2].key == 'undefined'){
+      if (requiresReveal && keys && f[2] === false){
         ops.unshift({
           kind : "reveal",
           fee : revealFee,
           public_key : keys.pk,
           source : from,
-					gas_limit: 10000,
-					storage_limit: 0
+          gas_limit: 10000,
+          storage_limit: 0
         });
       }
       counter = parseInt(f[1]) + 1;
@@ -577,7 +586,7 @@ rpc = {
 	},
 	simulateOperation : function(from, operation, keys){
 		return rpc.prepareOperation(from, operation, keys).then(function(fullOp){
-			return node.query('/chains/main/blocks/head/helpers/scripts/run_operation', fullOp.opOb) 
+			return node.query('/chains/main/blocks/head/helpers/scripts/run_operation', fullOp.opOb);
 		});
 	},
 	sendOperation: function (from, operation, keys, skipPrevalidation, revealFee) {
@@ -595,7 +604,6 @@ rpc = {
           fullOp.opbytes = signed.sbytes;
           fullOp.opOb.signature = signed.edsig;
         }
-				console.log(fullOp);
 				if (skipPrevalidation) return rpc.silentInject(fullOp.opbytes);
 				else return rpc.inject(fullOp.opOb, fullOp.opbytes);
       }
@@ -1249,20 +1257,26 @@ var prim_mapping_reverse = {
     true: '09'
   }
 }
-var forgeOpTags = {
-  "endorsement" : 0,
-  "seed_nonce_revelation" : 1,
-  "double_endorsement_evidence" : 2,
-  "double_baking_evidence" : 3,
-  "activate_account" : 4,
-  "proposals" : 5,
-  "ballot" : 6,
-  "reveal" : 7,
-  "transaction" : 8,
-  "origination" : 9,
-  "delegation" : 10,
-};
 function forgeOp(op){
+  var forgeOpTags = {
+    "endorsement" : 0,
+    "seed_nonce_revelation" : 1,
+    "double_endorsement_evidence" : 2,
+    "double_baking_evidence" : 3,
+    "activate_account" : 4,
+    "proposals" : 5,
+    "ballot" : 6,
+    "reveal" : 7,
+    "transaction" : 8,
+    "origination" : 9,
+    "delegation" : 10,
+  };
+  if (currentProtocol == 'PsBabyM1eUXZseaJdmXFApDSBqj8YBfwELoxZHHW77EMcAbbwAS'){
+    forgeOpTags.reveal = 107;
+    forgeOpTags.transaction = 108;
+    forgeOpTags.origination = 109;
+    forgeOpTags.delegation = 110;
+  }
   var fop;
   fop = eztz.utility.buf2hex(new Uint8Array([forgeOpTags[op.kind]]));
   switch (forgeOpTags[op.kind]) {
@@ -1339,8 +1353,60 @@ function forgeOp(op){
         }
       }
     break;
+    case 107: 
+    case 108: 
+    case 109: 
+    case 110: 
+      fop += forgePublicKeyHash(op.source);
+      fop += forgeZarith(op.fee);
+      fop += forgeZarith(op.counter);
+      fop += forgeZarith(op.gas_limit);
+      fop += forgeZarith(op.storage_limit);
+      if (forgeOpTags[op.kind] == 107) {
+        fop += forgePublicKey(op.public_key);
+      } else if (forgeOpTags[op.kind] == 108) {
+        fop += forgeZarith(op.amount);
+        fop += forgeAddress(op.destination);
+        if (typeof op.parameters != 'undefined' && op.parameters) {
+          fop += forgeBool(true);
+          fop += forgeEntrypoint();
+          fop += forgeParameters(op.parameters);
+        } else {
+          fop += forgeBool(false);
+        }
+      } else if (forgeOpTags[op.kind] == 109) {
+        fop += forgeZarith(op.balance);
+        if (typeof op.delegate != 'undefined' && op.delegate){
+          fop += forgeBool(true);
+          fop += forgePublicKeyHash(op.delegate);
+        } else {
+          fop += forgeBool(false);
+        }
+        fop += forgeBool(true);
+        fop += forgeScript(op.script);
+      } else if (forgeOpTags[op.kind] == 110) {
+        if (typeof op.delegate != 'undefined' && op.delegate){
+          fop += forgeBool(true);
+          fop += forgePublicKeyHash(op.delegate);
+        } else {
+          fop += forgeBool(false);
+        }
+      }
+    break;
   }
   return fop;
+}
+function forgeEntrypoint(e){
+  if (typeof e == 'undefined') e = 'default';
+  var entrypoints = {
+    'default' : "00",
+    'root' : "01",
+    'do' : "02",
+    'set_delegate' : "03",
+    'remove_delegate' : "04",
+  };
+  if (typeof entrypoints[e] == 'undefined') throw "Unknown entrypoint " + e;
+  return entrypoints[e];
 }
 function forgeBool(b){
   return (b ? "ff" : "00");
@@ -1416,6 +1482,61 @@ function toBytesInt32Hex (num) {
   return utility.buf2hex(toBytesInt32(num));
 }
 
+
+//Proto switcher
+var currentProtocol = defaultProtocol;
+var protocolDefinitions = {};
+protocolDefinitions['default'] = {
+  "library" : library,
+  "prefix" : prefix,
+  "watermark" : watermark,
+  "utility" : utility,
+  "crypto" : crypto,
+  "node" : node,
+  "rpc" : rpc,
+  "contract" : contract,
+  "trezor" : trezor,
+  "tezos" : tezos,
+};
+protocolDefinitions['PtCJ7pwo'] = protocolDefinitions['default'];
+protocolDefinitions['ProtoALp'] = protocolDefinitions['PtCJ7pwo'];
+protocolDefinitions['PsYLVpVv'] = protocolDefinitions['ProtoALp'];
+protocolDefinitions['PsddFKi3'] = protocolDefinitions['PsYLVpVv'];
+protocolDefinitions['Pt24m4xi'] = protocolDefinitions['PsddFKi3'];
+protocolDefinitions['PsBabyM1'] = protocolDefinitions['Pt24m4xi'];
+protocolDefinitions['PsBabyM1'].rpc.transfer = function (from, keys, to, amount, fee, parameter, gasLimit, storageLimit, revealFee, entrypoint) {
+  if (typeof revealFee == 'undefined') revealFee = '1269';
+  if (typeof gasLimit == 'undefined') gasLimit = '10200';
+  if (typeof storageLimit == 'undefined') storageLimit = '300';
+  // if (typeof parameter == 'undefined') parameter = ['default', 'Unit'];
+  // if (!parameter) parameter = ['default', 'Unit'];
+  // console.log(parameter);
+  var operation = {
+    "kind": "transaction",
+    "fee" : fee.toString(),
+    "gas_limit": gasLimit,
+    "storage_limit": storageLimit,
+    "amount": utility.mutez(amount).toString(),
+    "destination": to
+  };
+  if (parameter){
+    if (typeof parameter != "object") parameter = ['default', parameter];
+    operation['parameters'] = {
+      "entrypoint" : parameter[0],
+      "value" : [eztz.utility.sexp2mic(parameter[1])]
+    }
+  }
+  return rpc.sendOperation(from, operation, keys, false, revealFee);
+}
+
+
+function proto(p, lib){
+  var pp = p.substr(0,8);
+  if (typeof protocolDefinitions[pp] == 'undefined'){
+    throw "Unknown protocol";
+  }
+  return protocolDefinitions[pp][lib];
+}
 //Legacy
 utility.ml2tzjson = utility.sexp2mic;
 utility.tzjson2arr = utility.mic2arr;
@@ -1425,19 +1546,39 @@ utility.tztomin = utility.mutez;
 
 //Expose library
 eztz = {
-  library: library,
-  prefix: prefix,
-  watermark: watermark,
-  utility: utility,
-  crypto: crypto,
-  node: node,
-  rpc: rpc,
-  contract: contract,
-  trezor: trezor,
-  tezos : tezos
+  setProtocol : function(p){
+    if (typeof p != 'undefined') {
+      currentProtocol = p;
+      return true;
+    } else {
+      return rpc.getHeader().then(function(r){
+        currentProtocol = r.protocol;
+        return currentProtocol;
+      });
+    }
+  },
+  getProtocol : function(){
+    return currentProtocol;
+  },
+  resetProtocol : function(){
+    currentProtocol = defaultProtocol;
+    return currentProtocol;
+  },
+  library : proto(currentProtocol, 'library'),
+  prefix : proto(currentProtocol, 'prefix'),
+  watermark : proto(currentProtocol, 'watermark'),
+  utility : proto(currentProtocol, 'utility'),
+  crypto : proto(currentProtocol, 'crypto'),
+  node : proto(currentProtocol, 'node'),
+  rpc : proto(currentProtocol, 'rpc'),
+  contract : proto(currentProtocol, 'contract'),
+  trezor : proto(currentProtocol, 'trezor'),
+  tezos : proto(currentProtocol, 'tezos'),
+  proto : proto,
 };
 
 module.exports = {
   defaultProvider,
+  defaultProtocol,
   eztz: eztz,
 };
