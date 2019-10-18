@@ -540,36 +540,36 @@ rpc = {
     for(let i = 0; i < ops.length; i++){
       if (['transaction','origination','delegation'].indexOf(ops[i].kind) >= 0){
         requiresReveal = true;
-        promises.push(rpc.getCounter(from));
-        promises.push(rpc.getManager(from));
+        promises.push(rpc.getCounter(keys.pkh));
+        promises.push(rpc.getManager(keys.pkh));
         break;
       }
     }
     return Promise.all(promises).then(function (f) {
       head = f[0];
-      if (requiresReveal && keys && f[2] === false){
+      if (requiresReveal && keys && typeof f[2].key == 'undefined'){
         ops.unshift({
           kind : "reveal",
           fee : revealFee,
           public_key : keys.pk,
-          source : from,
+          source : keys.pkh,
           gas_limit: 10000,
           storage_limit: 0
         });
       }
       counter = parseInt(f[1]) + 1;
-      if (typeof counters[from] == 'undefined') counters[from] = counter;
-			if (counter > counters[from]) counters[from] = counter;
+      if (typeof counters[keys.pkh] == 'undefined') counters[keys.pkh] = counter;
+			if (counter > counters[keys.pkh]) counters[keys.pkh] = counter;
 			//fix reset bug temp
-			counters[from] = counter;
+			counters[keys.pkh] = counter;
       for(let i = 0; i < ops.length; i++){
         if (['proposals','ballot','transaction','origination','delegation'].indexOf(ops[i].kind) >= 0){
-          if (typeof ops[i].source == 'undefined') ops[i].source = from;
+          if (typeof ops[i].source == 'undefined') ops[i].source = keys.pkh;
         }
         if (['reveal', 'transaction','origination','delegation'].indexOf(ops[i].kind) >= 0) {
           if (typeof ops[i].gas_limit == 'undefined') ops[i].gas_limit = "0";
           if (typeof ops[i].storage_limit == 'undefined') ops[i].storage_limit = "0";
-          ops[i].counter = (counters[from]++).toString();
+          ops[i].counter = (counters[keys.pkh]++).toString();
           
            ops[i].fee = ops[i].fee.toString();
            ops[i].gas_limit = ops[i].gas_limit.toString();
@@ -621,12 +621,19 @@ rpc = {
         }
       }        
       if (errors.length) throw {error: "Operation Failed", errors:errors};
-      return node.query('/injection/operation', sopbytes);
+      return node.query('/injection/operation', sopbytes).then(function(r){
+        return r;
+      }).catch(function(e){
+        throw e;
+      });
     }).then(function (f) {
       return {
         hash : f,
         operations : opResponse
       };
+    }).catch(function(e){
+      console.error("Validation error", e);
+      throw e;
     });
   },
 	silentInject: function(sopbytes){
@@ -815,7 +822,6 @@ tezos = {
   forge : function(head, opOb, validateLocalForge){
     if (typeof validateLocalForge == 'undefined') validateLocalForge = true;
 		
-		
     return node.query('/chains/'+head.chain_id+'/blocks/'+head.hash+'/helpers/forge/operations', opOb).then(function(remoteForgedBytes){
       var localForgedBytes;
       localForgedBytes = utility.buf2hex(utility.b58cdecode(opOb.branch, prefix.b));
@@ -824,12 +830,15 @@ tezos = {
       }
       
       opOb.protocol = head.protocol;
-      if (localForgedBytes == remoteForgedBytes) return {
-				opbytes : localForgedBytes,
-				opOb : opOb
-			};
-      else throw "Forge validatione error - local and remote bytes don't match";
-    });
+      if (localForgedBytes == remoteForgedBytes) {
+        return {
+          opbytes : localForgedBytes,
+          opOb : opOb
+        };
+      } else {
+        throw "Forge validation error - local and remote bytes don't match";
+      }
+    })
   },
   encodeRawBytes : function (input){
       const rec = function(input){
@@ -1369,7 +1378,6 @@ function forgeOp(op){
         fop += forgeAddress(op.destination);
         if (typeof op.parameters != 'undefined' && op.parameters) {
           fop += forgeBool(true);
-          fop += forgeEntrypoint();
           fop += forgeParameters(op.parameters);
         } else {
           fop += forgeBool(false);
@@ -1396,18 +1404,6 @@ function forgeOp(op){
   }
   return fop;
 }
-function forgeEntrypoint(e){
-  if (typeof e == 'undefined') e = 'default';
-  var entrypoints = {
-    'default' : "00",
-    'root' : "01",
-    'do' : "02",
-    'set_delegate' : "03",
-    'remove_delegate' : "04",
-  };
-  if (typeof entrypoints[e] == 'undefined') throw "Unknown entrypoint " + e;
-  return entrypoints[e];
-}
 function forgeBool(b){
   return (b ? "ff" : "00");
 }
@@ -1417,8 +1413,17 @@ function forgeScript(s){
   return toBytesInt32Hex(t1.length/2) + t1 + toBytesInt32Hex(t2.length/2) + t2;
 }
 function forgeParameters(p){
-  var t = tezos.encodeRawBytes(p).toLowerCase();
-  return toBytesInt32Hex(t.length/2) + t;
+  var entrypoints = {
+    'default' : "00",
+    'root' : "01",
+    'do' : "02",
+    'set_delegate' : "03",
+    'remove_delegate' : "04",
+  };
+ if (typeof entrypoints[p.entrypoint] == 'undefined') throw "Unknown entrypoint " + p.entrypoint;
+  var fp = entrypoints[p.entrypoint];
+  var t = tezos.encodeRawBytes(p.value).toLowerCase();
+  return fp + toBytesInt32Hex(t.length/2) + t;
 }
 function forgeAddress(a){
   var fa;
@@ -1504,6 +1509,64 @@ protocolDefinitions['PsYLVpVv'] = protocolDefinitions['ProtoALp'];
 protocolDefinitions['PsddFKi3'] = protocolDefinitions['PsYLVpVv'];
 protocolDefinitions['Pt24m4xi'] = protocolDefinitions['PsddFKi3'];
 protocolDefinitions['PsBabyM1'] = protocolDefinitions['Pt24m4xi'];
+protocolDefinitions['PsBabyM1'].rpc.prepareOperation = function(from, operation, keys, revealFee){
+  if (typeof keys == 'undefined') keys = false;
+  if (typeof revealFee == 'undefined') revealFee = "1269";
+  var hash, counter, pred_block, sopbytes, returnedContracts, opOb;
+  var promises = [], requiresReveal=false;
+  promises.push(node.query('/chains/main/blocks/head/header'));
+  if (Array.isArray(operation)) {
+    ops = operation;
+  } else {
+    ops = [operation];
+  }
+  for(let i = 0; i < ops.length; i++){
+    if (['transaction','origination','delegation'].indexOf(ops[i].kind) >= 0){
+      requiresReveal = true;
+      promises.push(rpc.getCounter(from));
+      promises.push(rpc.getManager(from));
+      break;
+    }
+  }
+  return Promise.all(promises).then(function (f) {
+    head = f[0];
+    if (requiresReveal && keys && f[2] === false){
+      ops.unshift({
+        kind : "reveal",
+        fee : revealFee,
+        public_key : keys.pk,
+        source : from,
+        gas_limit: 10000,
+        storage_limit: 0
+      });
+    }
+    counter = parseInt(f[1]) + 1;
+    if (typeof counters[from] == 'undefined') counters[from] = counter;
+    if (counter > counters[from]) counters[from] = counter;
+    //fix reset bug temp
+    counters[from] = counter;
+    for(let i = 0; i < ops.length; i++){
+      if (['proposals','ballot','transaction','origination','delegation'].indexOf(ops[i].kind) >= 0){
+        if (typeof ops[i].source == 'undefined') ops[i].source = from;
+      }
+      if (['reveal', 'transaction','origination','delegation'].indexOf(ops[i].kind) >= 0) {
+        if (typeof ops[i].gas_limit == 'undefined') ops[i].gas_limit = "0";
+        if (typeof ops[i].storage_limit == 'undefined') ops[i].storage_limit = "0";
+        ops[i].counter = (counters[from]++).toString();
+        
+         ops[i].fee = ops[i].fee.toString();
+         ops[i].gas_limit = ops[i].gas_limit.toString();
+         ops[i].storage_limit = ops[i].storage_limit.toString();
+         ops[i].counter = ops[i].counter.toString();
+      }
+    }
+    opOb = {
+      "branch": head.hash,
+      "contents": ops
+    }
+    return tezos.forge(head, opOb);
+  })
+}
 protocolDefinitions['PsBabyM1'].rpc.transfer = function (from, keys, to, amount, fee, parameter, gasLimit, storageLimit, revealFee, entrypoint) {
   if (typeof revealFee == 'undefined') revealFee = '1269';
   if (typeof gasLimit == 'undefined') gasLimit = '10200';
@@ -1521,9 +1584,10 @@ protocolDefinitions['PsBabyM1'].rpc.transfer = function (from, keys, to, amount,
   };
   if (parameter){
     if (typeof parameter != "object") parameter = ['default', parameter];
+    if (typeof parameter[1] == 'string') parameter[1] = eztz.utility.sexp2mic(parameter[1]);
     operation['parameters'] = {
       "entrypoint" : parameter[0],
-      "value" : [eztz.utility.sexp2mic(parameter[1])]
+      "value" : parameter[1]
     }
   }
   return rpc.sendOperation(from, operation, keys, false, revealFee);
