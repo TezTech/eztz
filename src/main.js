@@ -328,7 +328,7 @@ crypto = {
     }
   },
   generateKeys: function (m, p) {
-    const s = library.bip39.mnemonicToSeed(m, p).slice(0, 32);
+    const s = library.bip39.mnemonicToSeedSync(m, p).slice(0, 32);
     const kp = library.sodium.crypto_sign_seed_keypair(s);
     return {
       mnemonic: m,
