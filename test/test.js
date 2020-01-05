@@ -61,6 +61,7 @@ describe('main', () => {
   describe('crypto', () => {
     const main = require('../src/main');
     const crypto = main.eztz.crypto;
+    const watermark = main.eztz.watermark;
 
     test('generateMnemonic', () => {
       const string = crypto.generateMnemonic();
@@ -123,6 +124,20 @@ describe('main', () => {
       // expect(typeof keys.sig).toBe('string');
       // expect(typeof keys.edsig).toBe('string');
       // expect(typeof keys.sbytes).toBe('string');
+    });
+
+    test('sign and verify', () => {
+      const keys = crypto.generateKeys('', '');
+      const bytes = "20aa4d05fecad06b193f909564d4fcfd90e4cd01a6e13298329d802420dff96a9be42bcbe4739a783c117fa13fb42cf007cb67054a12fb977aca95c442745805";
+      let sign = crypto.sign(bytes, keys.sk);
+      expect(crypto.verify(bytes, sign.sig, keys.pk)).toBe(true);
+    });
+
+    test('sign and verify with watermark', () => {
+      const keys = crypto.generateKeys('', '');
+      const bytes = "20aa4d05fecad06b193f909564d4fcfd90e4cd01a6e13298329d802420dff96a9be42bcbe4739a783c117fa13fb42cf007cb67054a12fb977aca95c442745805";
+      let sign = crypto.sign(bytes, keys.sk, watermark.generic);
+      expect(crypto.verify(bytes, sign.sig, keys.pk, watermark.generic)).toBe(true);
     });
   });
 
