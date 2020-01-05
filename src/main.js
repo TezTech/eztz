@@ -351,8 +351,10 @@ crypto = {
       sbytes: sbytes,
     }
   },
-  verify: function (bytes, sig, pk) {
-    return library.sodium.crypto_sign_verify_detached(sig, utility.hex2buf(bytes), utility.b58cdecode(pk, prefix.edpk));
+  verify: function (bytes, sig, pk, wm) {
+    var bb = utility.hex2buf(bytes);
+    if (typeof wm != 'undefined') bb = utility.mergebuf(wm, bb);
+    return library.sodium.crypto_sign_verify_detached(sig, library.sodium.crypto_generichash(32, bb), utility.b58cdecode(pk, prefix.edpk));
   },
 };
 node = {
