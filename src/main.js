@@ -328,7 +328,7 @@ crypto = {
     }
   },
   generateKeys: function (m, p) {
-    const s = library.bip39.mnemonicToSeed(m, p).slice(0, 32);
+    const s = library.bip39.mnemonicToSeedSync(m, p).slice(0, 32);
     const kp = library.sodium.crypto_sign_seed_keypair(s);
     return {
       mnemonic: m,
@@ -355,7 +355,7 @@ crypto = {
     return library.sodium.crypto_sign_verify_detached(sig, utility.hex2buf(bytes), utility.b58cdecode(pk, prefix.edpk));
   },
 };
-node = {
+const node = {
   activeProvider: defaultProvider,
   debugMode: false,
   async: true,
@@ -818,7 +818,7 @@ contract = {
     return setInterval(ct, timeout * 1000);
   },
 };
-tezos = {
+const tezos = {
   forge : function(head, opOb, validateLocalForge){
     if (typeof validateLocalForge == 'undefined') validateLocalForge = true;
 		
@@ -1609,7 +1609,7 @@ utility.mintotz = utility.totez;
 utility.tztomin = utility.mutez;
 
 //Expose library
-eztz = {
+const eztz = {
   setProtocol : function(p){
     if (typeof p != 'undefined') {
       currentProtocol = p;
